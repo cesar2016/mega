@@ -1,5 +1,13 @@
 import React, { useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import {
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { z } from "zod";
 import { supabase } from "lib/supabase";
 import { showToast } from "lib/utils";
@@ -7,6 +15,8 @@ import { Icon } from "components/ui/Icon";
 import { Button } from "components/ui/Button";
 import { Input } from "components/ui/Input";
 import { Gradient } from "components/ui/Screen";
+
+const CAMPO_BG = require("../../assets/images/campo-hacienda.png");
 
 const AuthSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -102,7 +112,7 @@ export default function AuthScreen() {
         <View className="flex-1 flex-col lg:flex-row">
           {/* Panel de marca (escritorio) */}
           <Gradient
-            colors={["#3E5645", "#5F8668", "#C4764F"]}
+            colors={["#0F381E", "#15803D", "#0284C7", "#7E3F1C"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             className="hidden w-[46%] max-w-xl flex-col justify-between gap-10 px-10 py-14 lg:flex"
@@ -146,12 +156,21 @@ export default function AuthScreen() {
             </Text>
           </Gradient>
 
-          {/* Formulario */}
-          <View className="flex-1 items-center justify-center px-4 py-8 md:px-8 md:py-12">
-            <View className="w-full max-w-md gap-6">
+          {/* Formulario con fondo de la imagen de hacienda en la derecha */}
+          <View className="relative flex-1 items-center justify-center overflow-hidden px-4 py-8 md:px-8 md:py-12">
+            <Image
+              source={CAMPO_BG}
+              resizeMode="cover"
+              className="absolute inset-0 h-full w-full"
+              style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" }}
+            />
+            {/* Capa difuminada de blanco/canvas para que el fondo de gauchos y ganado se aprecie con gran legibilidad */}
+            <View className="absolute inset-0 bg-canvas/75" />
+
+            <View className="relative z-10 w-full max-w-md gap-6">
               {/* Marca en mobile / tablet */}
               <View className="items-center gap-3 lg:hidden">
-                <View className="h-14 w-14 items-center justify-center rounded-2xl bg-sage-500">
+                <View className="h-14 w-14 items-center justify-center rounded-2xl bg-sage-500 shadow-md">
                   <Icon name="sprout" size={26} className="text-white" />
                 </View>
                 <Text className="text-center text-xl font-bold text-ink">Mercado Ganadero</Text>
@@ -175,7 +194,7 @@ export default function AuthScreen() {
               </View>
 
               {/* Selector login / registro */}
-              <View className="flex-row rounded-2xl border border-line bg-surface p-1">
+              <View className="flex-row rounded-2xl border border-line bg-white/90 p-1 shadow-sm">
                 {(["login", "registro"] as Mode[]).map((valor) => {
                   const activo = mode === valor;
                   return (
@@ -186,7 +205,7 @@ export default function AuthScreen() {
                       accessibilityState={{ selected: activo }}
                       className={[
                         "flex-1 items-center rounded-xl py-2.5",
-                        activo ? "bg-sage-500" : "active:bg-surface-sunk",
+                        activo ? "bg-sage-500 shadow-sm" : "active:bg-surface-sunk",
                       ].join(" ")}
                     >
                       <Text
@@ -202,7 +221,7 @@ export default function AuthScreen() {
                 })}
               </View>
 
-              <View className="gap-4 rounded-3xl border border-line-soft bg-surface p-5 shadow-soft md:p-7">
+              <View className="gap-4 rounded-3xl border border-line-soft bg-white p-5 shadow-card md:p-7">
                 {mode === "registro" ? (
                   <Input
                     label="Nombre y apellido"
@@ -259,11 +278,11 @@ export default function AuthScreen() {
                 />
               </View>
 
-              <Text className="text-center text-sm text-ink-muted">
+              <Text className="text-center text-sm font-medium text-ink-soft">
                 {mode === "login" ? "¿No tenés cuenta?" : "¿Ya tenés cuenta?"}{" "}
                 <Text
                   onPress={() => cambiarModo(mode === "login" ? "registro" : "login")}
-                  className="font-semibold text-sage-600"
+                  className="font-bold text-sage-600"
                 >
                   {mode === "login" ? "Registrate" : "Iniciá sesión"}
                 </Text>
