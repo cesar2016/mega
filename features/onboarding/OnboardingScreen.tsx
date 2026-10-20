@@ -6,6 +6,7 @@ import type { IconName } from "components/ui/Icon.types";
 import { Button } from "components/ui/Button";
 import { Input } from "components/ui/Input";
 import { Gradient } from "components/ui/Screen";
+import { Logo } from "components/ui/Logo";
 
 const ROLES: {
   valor: "productor" | "comprador" | "fletero";
@@ -57,9 +58,7 @@ export default function OnboardingScreen() {
         <View className="w-full max-w-2xl gap-7">
           {/* Encabezado */}
           <View className="items-center gap-3">
-            <View className="h-14 w-14 items-center justify-center rounded-2xl bg-sage-500">
-              <Icon name="sprout" size={26} className="text-white" />
-            </View>
+            <Logo size={76} className="rounded-full shadow-md" />
             <Text className="text-center text-2xl font-bold tracking-tight text-ink">
               {step === 1 ? "¡Bienvenido a Mercado Ganadero!" : "Completá tu perfil"}
             </Text>

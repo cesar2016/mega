@@ -5,6 +5,7 @@ import { useAuthStore } from "store/authStore";
 import { usePendientesMatch } from "lib/hooks/useMatches";
 import { Icon } from "components/ui/Icon";
 import { Avatar } from "components/ui/Avatar";
+import { Logo } from "components/ui/Logo";
 import { NAV_ITEMS, activeNavItem } from "./navItems";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -30,9 +31,7 @@ export function AppSidebar() {
     <View className="h-full w-[264px] shrink-0 border-r border-line-soft bg-surface px-4 py-6">
       {/* Marca */}
       <View className="mb-8 flex-row items-center gap-3 px-2">
-        <View className="h-11 w-11 items-center justify-center rounded-2xl bg-sage-500">
-          <Icon name="sprout" size={22} className="text-white" />
-        </View>
+        <Logo size={44} className="rounded-full shadow-sm" />
         <View className="flex-1">
           <Text className="text-[15px] font-bold leading-5 text-ink">Mercado Ganadero</Text>
           <Text className="text-[11px] leading-4 text-ink-muted">Compra y venta de hacienda</Text>

@@ -15,6 +15,7 @@ import { Icon } from "components/ui/Icon";
 import { Button } from "components/ui/Button";
 import { Input } from "components/ui/Input";
 import { Gradient } from "components/ui/Screen";
+import { Logo } from "components/ui/Logo";
 
 const CAMPO_BG = require("../../assets/images/campo-hacienda.png");
 
@@ -117,13 +118,11 @@ export default function AuthScreen() {
             end={{ x: 1, y: 1 }}
             className="hidden w-[46%] max-w-xl flex-col justify-between gap-10 px-10 py-14 lg:flex"
           >
-            <View className="flex-row items-center gap-3">
-              <View className="h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
-                <Icon name="sprout" size={24} className="text-white" />
-              </View>
+            <View className="flex-row items-center gap-3.5">
+              <Logo size={52} className="rounded-full shadow-lg" />
               <View>
-                <Text className="text-lg font-bold text-white">Mercado Ganadero</Text>
-                <Text className="text-sm text-white/70">Compra y venta de hacienda</Text>
+                <Text className="text-xl font-bold tracking-tight text-white">Mercado Ganadero</Text>
+                <Text className="text-xs text-white/80">Compra y venta de hacienda</Text>
               </View>
             </View>
 
@@ -170,9 +169,7 @@ export default function AuthScreen() {
             <View className="relative z-10 w-full max-w-md gap-6">
               {/* Marca en mobile / tablet */}
               <View className="items-center gap-3 lg:hidden">
-                <View className="h-14 w-14 items-center justify-center rounded-2xl bg-sage-500 shadow-md">
-                  <Icon name="sprout" size={26} className="text-white" />
-                </View>
+                <Logo size={76} className="rounded-full shadow-md" />
                 <Text className="text-center text-xl font-bold text-ink">Mercado Ganadero</Text>
                 <Text className="text-center text-sm text-ink-muted">
                   {mode === "login" ? "Iniciá sesión para operar" : "Creá tu cuenta"}

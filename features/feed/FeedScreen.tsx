@@ -78,7 +78,7 @@ export default function FeedScreen() {
         }
       >
         <Gradient
-          colors={["#E4EDE5", "#F8E6DA", "#F4F2EC"]}
+          colors={["#DCFCE7", "#E0F2FE", "#FDF8F5"]}
           className="flex-col gap-4 rounded-3xl border border-line-soft px-5 py-5 lg:flex-row lg:items-center lg:justify-between lg:px-7"
         >
           <View className="min-w-0 flex-1 gap-2">
