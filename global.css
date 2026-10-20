@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Ajustes globales que sólo aplican en web (en nativo NativeWind descarta
+ * las reglas que no son utilidades).
+ */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: theme("colors.canvas");
+  color: theme("colors.ink.DEFAULT");
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue",
+    Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar discreto en escritorio. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: theme("colors.line");
+  border-radius: 9999px;
+  border: 3px solid theme("colors.canvas");
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: theme("colors.ink.muted");
+}

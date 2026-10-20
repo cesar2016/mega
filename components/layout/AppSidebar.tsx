@@ -1,0 +1,116 @@
+import React from "react";
+import { Pressable, Text, View } from "react-native";
+import { usePathname, useRouter } from "expo-router";
+import { useAuthStore } from "store/authStore";
+import { usePendientesMatch } from "lib/hooks/useMatches";
+import { Icon } from "components/ui/Icon";
+import { Avatar } from "components/ui/Avatar";
+import { NAV_ITEMS, activeNavItem } from "./navItems";
+
+const ROLE_LABEL: Record<string, string> = {
+  productor: "Productor",
+  comprador: "Comprador",
+  fletero: "Transportista",
+  admin: "Administrador",
+};
+
+/**
+ * Navegación lateral para escritorio (web >= 1024px). Reemplaza las
+ * pestañas inferiores cuando hay ancho suficiente.
+ */
+export function AppSidebar() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const profile = useAuthStore((state) => state.profile);
+
+  const activo = activeNavItem(pathname);
+  const pendientes = usePendientesMatch({ enabled: !!profile });
+
+  return (
+    <View className="h-full w-[264px] shrink-0 border-r border-line-soft bg-surface px-4 py-6">
+      {/* Marca */}
+      <View className="mb-8 flex-row items-center gap-3 px-2">
+        <View className="h-11 w-11 items-center justify-center rounded-2xl bg-sage-500">
+          <Icon name="sprout" size={22} className="text-white" />
+        </View>
+        <View className="flex-1">
+          <Text className="text-[15px] font-bold leading-5 text-ink">Mercado Ganadero</Text>
+          <Text className="text-[11px] leading-4 text-ink-muted">Compra y venta de hacienda</Text>
+        </View>
+      </View>
+
+      {/* Navegación */}
+      <View className="gap-1">
+        {NAV_ITEMS.map((item) => {
+          const focused = activo?.name === item.name;
+
+          return (
+            <Pressable
+              key={item.name}
+              accessibilityRole="button"
+              accessibilityState={{ selected: focused }}
+              onPress={() => router.push(item.href)}
+              className={[
+                "flex-row items-center gap-3 rounded-2xl px-3 py-2.5",
+                focused ? "bg-sage-50" : "active:bg-surface-sunk",
+              ].join(" ")}
+            >
+              <Icon
+                name={item.icon}
+                size={18}
+                className={focused ? "text-sage-600" : "text-ink-muted"}
+              />
+              <Text
+                className={[
+                  "text-sm",
+                  focused ? "font-bold text-sage-700" : "font-medium text-ink-soft",
+                ].join(" ")}
+              >
+                {item.title}
+              </Text>
+              {item.name === "matches" && pendientes > 0 ? (
+                <View className="ml-auto min-w-[20px] items-center justify-center rounded-full bg-clay-500 px-1.5 py-0.5">
+                  <Text className="text-[10px] font-bold text-white">{pendientes}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View className="flex-1" />
+
+      {/* Acción principal */}
+      <Pressable
+        onPress={() => router.push("/(main)/oferta-nueva")}
+        accessibilityRole="button"
+        accessibilityLabel="Publicar oferta"
+        className="mb-4 flex-row items-center justify-center gap-2 rounded-2xl bg-sage-500 px-4 py-3 active:bg-sage-600"
+      >
+        <Icon name="plus" size={18} className="text-white" />
+        <Text className="text-sm font-bold text-white">Publicar oferta</Text>
+      </Pressable>
+
+      {/* Usuario */}
+      <View className="flex-row items-center gap-3 rounded-2xl border border-line-soft bg-surface-soft px-3 py-2.5">
+        <Avatar uri={profile?.avatar_url} nombre={profile?.nombre} size={36} />
+        <View className="min-w-0 flex-1">
+          <Text className="text-[13px] font-semibold text-ink" numberOfLines={1}>
+            {profile?.nombre ?? "Invitado"}
+          </Text>
+          <Text className="text-[11px] capitalize text-ink-muted" numberOfLines={1}>
+            {ROLE_LABEL[profile?.rol ?? ""] ?? "Mercado"}
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => router.push("/(main)/tabs/perfil")}
+          accessibilityRole="button"
+          accessibilityLabel="Ver perfil"
+          className="h-8 w-8 items-center justify-center rounded-lg active:bg-surface-sunk"
+        >
+          <Icon name="chevronRight" size={16} className="text-ink-muted" />
+        </Pressable>
+      </View>
+    </View>
+  );
+}

@@ -1,0 +1,9 @@
+node_modules/
+.expo/
+dist/
+web-build/
+supabase/.temp/
+.env
+.env.local
+*.log
+.DS_Store

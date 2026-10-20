@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Mercado Ganadero",
+    "slug": "mercado-ganadero",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "mercado-ganadero",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-sqlite",
+        {
+          "dbName": "mercado_ganadero"
+        }
+      ],
+      "expo-asset",
+      "expo-font",
+      "expo-video"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app needs access to location to show you offers near your field.",
+        "NSLocationAlwaysUsageDescription": "This app needs access to your location even when running in the background."
+      }
+    },
+    "android": {
+      "package": "com.mercado.ganadero",
+      "versionCode": 1,
+      "versionName": "1.0.0",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    }
+  }
+}
