@@ -30,6 +30,7 @@ import { Button } from "components/ui/Button";
 import { Input } from "components/ui/Input";
 import { Gradient, Screen } from "components/ui/Screen";
 import { MobileTopBar } from "components/layout/MobileTopBar";
+import { buildVideoTrimUrl } from "components/ui/OfertaMedia";
 import type { OfertaMediaRow } from "components/ui/OfertaMedia";
 import {
   useOfferMedia,
@@ -37,6 +38,17 @@ import {
   MAX_VIDEOS,
   MAX_VIDEO_DURATION,
 } from "./useOfferMedia";
+import { VideoGalleryCard, VideoTrimModal } from "./VideoTrimModal";
+import type { VideoTrimResult } from "./VideoTrimModal";
+
+type VideoPendienteRecorte = {
+  id?: string;
+  uri: string;
+  mimeType?: string;
+  duracionInicial: number;
+  trimInicio?: number;
+  trimFin?: number;
+};
 
 const OfferSchema = z.object({
   categoria: z.string().min(1, "Categoría requerida"),
@@ -77,6 +89,7 @@ export default function OfferCreateScreen() {
   const {
     addPhotos,
     addVideo,
+    updateVideo,
     loadInitialMedia,
     removeMedia,
     clearAll,
@@ -91,6 +104,7 @@ export default function OfferCreateScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [eliminando, setEliminando] = useState(false);
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
+  const [videoEnEdicion, setVideoEnEdicion] = useState<VideoPendienteRecorte | null>(null);
 
   const {
     data: ofertaExistente,
@@ -190,24 +204,30 @@ export default function OfferCreateScreen() {
       }
 
       for (const video of videos) {
-        if (video.url) {
-          urlPorId[video.id] = video.url;
-          continue;
+        let baseVideoUrl = video.url;
+        if (!baseVideoUrl) {
+          const extension = extensionForMime(video.mimeType, "mp4");
+          const path = `${user.id}/${video.id}.${extension}`;
+          const { error: uploadError } = await supabase.storage
+            .from("oferta_media")
+            .upload(path, await toUploadBody(video.uri), {
+              contentType: video.mimeType ?? "video/mp4",
+              cacheControl: "3600",
+              upsert: true,
+            });
+
+          if (uploadError) throw uploadError;
+
+          const { data } = supabase.storage.from("oferta_media").getPublicUrl(path);
+          baseVideoUrl = data.publicUrl;
         }
-        const extension = extensionForMime(video.mimeType, "mp4");
-        const path = `${user.id}/${video.id}.${extension}`;
-        const { error: uploadError } = await supabase.storage
-          .from("oferta_media")
-          .upload(path, await toUploadBody(video.uri), {
-            contentType: video.mimeType ?? "video/mp4",
-            cacheControl: "3600",
-            upsert: true,
-          });
 
-        if (uploadError) throw uploadError;
-
-        const { data } = supabase.storage.from("oferta_media").getPublicUrl(path);
-        urlPorId[video.id] = data.publicUrl;
+        urlPorId[video.id] = buildVideoTrimUrl(
+          baseVideoUrl,
+          video.trimInicio,
+          video.trimFin,
+          video.duracionOriginal
+        );
       }
 
       let targetOfertaId = ofertaId;
@@ -229,14 +249,14 @@ export default function OfferCreateScreen() {
         });
 
         // Limpiar de Storage los archivos antiguos que el productor quitó
-        const urlsAnteriores = ((ofertaExistente?.oferta_media ?? []) as OfertaMediaRow[])
-          .map((m) => m.url)
-          .filter((u): u is string => Boolean(u));
-        const urlsActuales = new Set(Object.values(urlPorId));
-        const pathsEliminados = urlsAnteriores
-          .filter((u) => !urlsActuales.has(u))
-          .map((u) => storagePathFromPublicUrl(u))
-          .filter((p): p is string => Boolean(p));
+        const pathsActuales = new Set(
+          Object.values(urlPorId)
+            .map((u) => storagePathFromPublicUrl(u))
+            .filter((p): p is string => p !== null)
+        );
+        const pathsEliminados = ((ofertaExistente?.oferta_media ?? []) as OfertaMediaRow[])
+          .map((m) => storagePathFromPublicUrl(m.url))
+          .filter((p): p is string => p !== null && !pathsActuales.has(p));
 
         if (pathsEliminados.length > 0) {
           await supabase.storage
@@ -295,7 +315,10 @@ export default function OfferCreateScreen() {
           oferta_id: targetOfertaId,
           tipo: "video" as const,
           url: urlPorId[video.id],
-          duracion_segundos: video.duracion ?? null,
+          duracion_segundos: Math.min(
+            MAX_VIDEO_DURATION,
+            Math.max(1, Math.round(video.duracion ?? 1))
+          ),
           orden: index + 1,
           es_portada: false,
         })),
@@ -375,6 +398,7 @@ export default function OfferCreateScreen() {
     }
   }, [addPhotos, fotos.length, isMaxReached]);
 
+  // Selección de video con apertura inmediata del modal de vista previa y recorte (<= 20s)
   const pickerVideo = useCallback(async () => {
     if (isMaxReached("video")) {
       showToast("Máximo " + MAX_VIDEOS + " videos permitidos", "error");
@@ -384,27 +408,57 @@ export default function OfferCreateScreen() {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["videos"],
-        allowsEditing: true,
-        aspect: [16, 9],
+        videoMaxDuration: MAX_VIDEO_DURATION,
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const rawDur = result.assets[0].duration ?? 0;
-        const duracion = rawDur > 1000 ? Math.round(rawDur / 1000) : Math.round(rawDur);
-        if (duracion > MAX_VIDEO_DURATION) {
-          showToast(
-            `Los videos deben tener como máximo ${MAX_VIDEO_DURATION} segundos`,
-            "error"
-          );
-          return;
-        }
-        addVideo(result.assets[0].uri, duracion, result.assets[0].mimeType);
+        const asset = result.assets[0];
+        const rawDur = asset.duration ?? 0;
+        const duracionDetectada =
+          rawDur > 1000 ? Number((rawDur / 1000).toFixed(1)) : Number(rawDur.toFixed(1));
+
+        setVideoEnEdicion({
+          uri: asset.uri,
+          mimeType: asset.mimeType,
+          duracionInicial: duracionDetectada,
+          trimInicio: 0,
+          trimFin:
+            duracionDetectada > 0
+              ? Math.min(duracionDetectada, MAX_VIDEO_DURATION)
+              : MAX_VIDEO_DURATION,
+        });
       }
     } catch (err) {
       console.error("Error picking video:", err);
     }
-  }, [addVideo, isMaxReached]);
+  }, [isMaxReached]);
+
+  const handleConfirmVideoTrim = useCallback(
+    (res: VideoTrimResult) => {
+      if (!videoEnEdicion) return;
+
+      if (videoEnEdicion.id) {
+        updateVideo(videoEnEdicion.id, {
+          duracion: res.duracion,
+          duracionOriginal: res.duracionOriginal,
+          trimInicio: res.trimInicio,
+          trimFin: res.trimFin,
+        });
+        showToast(`Recorte actualizado (${res.duracion}s)`, "success");
+      } else {
+        addVideo(videoEnEdicion.uri, res.duracion, videoEnEdicion.mimeType, {
+          duracionOriginal: res.duracionOriginal,
+          trimInicio: res.trimInicio,
+          trimFin: res.trimFin,
+        });
+        showToast(`Video agregado (${res.duracion}s)`, "success");
+      }
+
+      setVideoEnEdicion(null);
+    },
+    [addVideo, updateVideo, videoEnEdicion]
+  );
 
   const puedePublicar =
     !!values.categoria &&
@@ -796,30 +850,35 @@ export default function OfferCreateScreen() {
                     </Pressable>
                   </View>
 
-                  <View className="gap-2">
+                  <View className="gap-1">
                     <Text className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-                      Videos (hasta {MAX_VIDEOS})
+                      Videos ({videos.length}/{MAX_VIDEOS} · hasta {MAX_VIDEO_DURATION}s c/u)
                     </Text>
-                    <View className="flex-row flex-wrap gap-3">
+                    <Text className="text-xs text-ink-muted">
+                      Al subir un video o tocar &quot;Recortar&quot; se abre la vista previa para
+                      ajustar el fragmento de hasta {MAX_VIDEO_DURATION} segundos.
+                    </Text>
+                    <View className="flex-row flex-wrap gap-3 pt-1">
                       {videos.map((video) => (
-                        <View
+                        <VideoGalleryCard
                           key={video.id}
-                          className="h-24 w-32 overflow-hidden rounded-2xl border border-line-soft bg-surface-sunk"
-                        >
-                          <Image source={{ uri: video.uri }} className="h-full w-full" />
-                          <View className="absolute bottom-1 right-1 rounded-lg bg-ink/70 px-1.5 py-0.5">
-                            <Text className="text-[10px] font-semibold text-white">
-                              {video.duracion}s
-                            </Text>
-                          </View>
-                          <Pressable
-                            onPress={() => removeMedia(video.id)}
-                            accessibilityLabel="Quitar video"
-                            className="absolute right-1 top-1 h-6 w-6 items-center justify-center rounded-full bg-ink/60"
-                          >
-                            <Icon name="x" size={12} className="text-white" />
-                          </Pressable>
-                        </View>
+                          video={video}
+                          onEdit={() =>
+                            setVideoEnEdicion({
+                              id: video.id,
+                              uri: video.uri,
+                              mimeType: video.mimeType,
+                              duracionInicial: video.duracionOriginal ?? video.duracion ?? 0,
+                              trimInicio: video.trimInicio ?? 0,
+                              trimFin:
+                                video.trimFin ??
+                                (video.duracion && video.duracion > 0
+                                  ? (video.trimInicio ?? 0) + video.duracion
+                                  : undefined),
+                            })
+                          }
+                          onRemove={() => removeMedia(video.id)}
+                        />
                       ))}
 
                       <Pressable
@@ -827,15 +886,15 @@ export default function OfferCreateScreen() {
                         disabled={isMaxReached("video")}
                         accessibilityLabel="Añadir video"
                         className={[
-                          "h-24 w-32 items-center justify-center gap-1 rounded-2xl border border-dashed",
+                          "h-28 w-40 items-center justify-center gap-1 rounded-2xl border border-dashed px-2",
                           isMaxReached("video")
                             ? "border-line bg-surface-sunk opacity-50"
                             : "border-clay-300 bg-clay-50 active:bg-clay-100",
                         ].join(" ")}
                       >
                         <Icon name="video" size={20} className="text-clay-600" />
-                        <Text className="text-[10px] font-semibold text-clay-700">
-                          {videos.length}/{MAX_VIDEOS}
+                        <Text className="text-center text-[10px] font-semibold text-clay-700">
+                          Subir y recortar video ({videos.length}/{MAX_VIDEOS})
                         </Text>
                       </Pressable>
                     </View>
@@ -970,6 +1029,19 @@ export default function OfferCreateScreen() {
           </View>
         </Screen>
       </ScrollView>
+
+      {videoEnEdicion ? (
+        <VideoTrimModal
+          visible={Boolean(videoEnEdicion)}
+          uri={videoEnEdicion.uri}
+          initialDuracion={videoEnEdicion.duracionInicial}
+          initialInicio={videoEnEdicion.trimInicio}
+          initialFin={videoEnEdicion.trimFin}
+          esEdicionVideo={Boolean(videoEnEdicion.id)}
+          onCancel={() => setVideoEnEdicion(null)}
+          onConfirm={handleConfirmVideoTrim}
+        />
+      ) : null}
     </View>
   );
 }

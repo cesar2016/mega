@@ -34,3 +34,51 @@ export function portadaDe(media?: OfertaMediaRow[] | null): OfertaMediaRow | nul
   if (fotos.length === 0) return null;
   return fotos.find((foto) => foto.es_portada) ?? fotos[0];
 }
+
+/**
+ * Extrae el rango de recorte `#t=inicio,fin` (Media Fragments URI) si existe en la URL.
+ */
+export function parseVideoTrimUrl(url?: string | null): {
+  cleanUrl: string;
+  inicio?: number;
+  fin?: number;
+} {
+  if (!url) return { cleanUrl: "" };
+  const [cleanUrl, hash] = url.split("#");
+  if (!hash) return { cleanUrl };
+
+  const match = hash.match(/(?:^|&)t=([0-9.]+)(?:,([0-9.]+))?/);
+  if (!match) return { cleanUrl };
+
+  const inicio = Number(match[1]);
+  const fin = match[2] !== undefined ? Number(match[2]) : undefined;
+  return {
+    cleanUrl,
+    inicio: Number.isFinite(inicio) ? inicio : undefined,
+    fin: fin !== undefined && Number.isFinite(fin) ? fin : undefined,
+  };
+}
+
+/**
+ * Construye una URL con el fragmento `#t=inicio,fin` cuando se aplicó un recorte.
+ */
+export function buildVideoTrimUrl(
+  url: string,
+  inicio?: number,
+  fin?: number,
+  duracionOriginal?: number
+): string {
+  const { cleanUrl } = parseVideoTrimUrl(url);
+  if (inicio === undefined || fin === undefined) return cleanUrl;
+
+  const recortaInicio = inicio > 0.05;
+  const recortaFin =
+    duracionOriginal !== undefined ? fin < duracionOriginal - 0.05 : true;
+
+  if (!recortaInicio && !recortaFin) {
+    return cleanUrl;
+  }
+
+  return `${cleanUrl}#t=${Number(inicio.toFixed(1))},${Number(fin.toFixed(1))}`;
+}
+

@@ -84,7 +84,7 @@ export function storagePathFromPublicUrl(url?: string | null): string | null {
   const marker = "/storage/v1/object/public/oferta_media/";
   const idx = url.indexOf(marker);
   if (idx === -1) return null;
-  const path = url.slice(idx + marker.length).split("?")[0];
+  const path = url.slice(idx + marker.length).split("?")[0].split("#")[0];
   return path ? decodeURIComponent(path) : null;
 }
 

@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVideoPlayer, VideoView } from "expo-video";
@@ -12,7 +12,13 @@ import { Badge, Card, SectionHeader } from "components/ui/Card";
 import { Button } from "components/ui/Button";
 import { Gradient, Screen } from "components/ui/Screen";
 import { MobileTopBar } from "components/layout/MobileTopBar";
-import { fotosDe, mediaOrdenado, portadaDe, videosDe } from "components/ui/OfertaMedia";
+import {
+  fotosDe,
+  mediaOrdenado,
+  parseVideoTrimUrl,
+  portadaDe,
+  videosDe,
+} from "components/ui/OfertaMedia";
 import type { OfertaMediaRow } from "components/ui/OfertaMedia";
 
 type Oferta = {
@@ -50,12 +56,68 @@ function formatPrecio(oferta: Oferta) {
   return `$${Number(oferta.precio).toLocaleString("es-AR")}`;
 }
 
-/** Reproductor de video (web y nativo con expo-video). */
+/** Reproductor de video (web y nativo, respetando el rango de recorte `#t=inicio,fin`). */
 function VideoPlayer({ url }: { url: string }) {
+  const { cleanUrl, inicio, fin } = parseVideoTrimUrl(url);
+
+  if (Platform.OS === "web") {
+    return (
+      <View className="h-full w-full bg-ink">
+        <video
+          src={url}
+          controls
+          playsInline
+          onLoadedMetadata={(e) => {
+            if (inicio !== undefined && inicio > 0) {
+              e.currentTarget.currentTime = inicio;
+            }
+          }}
+          onTimeUpdate={(e) => {
+            const el = e.currentTarget;
+            if (fin !== undefined && el.currentTime >= fin) {
+              el.pause();
+              el.currentTime = inicio ?? 0;
+            } else if (inicio !== undefined && el.currentTime < inicio - 0.25) {
+              el.currentTime = inicio;
+            }
+          }}
+          style={{ width: "100%", height: "100%", objectFit: "contain" }}
+        />
+      </View>
+    );
+  }
+
+  return <NativeVideoPlayer url={cleanUrl || url} inicio={inicio} fin={fin} />;
+}
+
+function NativeVideoPlayer({
+  url,
+  inicio,
+  fin,
+}: {
+  url: string;
+  inicio?: number;
+  fin?: number;
+}) {
   const player = useVideoPlayer(url, (p) => {
     p.loop = false;
     p.muted = true;
+    if (inicio !== undefined && inicio > 0) {
+      p.currentTime = inicio;
+    }
   });
+
+  useEffect(() => {
+    if (inicio === undefined && fin === undefined) return;
+    const timer = setInterval(() => {
+      const current = player.currentTime ?? 0;
+      if (fin !== undefined && current >= fin) {
+        player.pause();
+        player.currentTime = inicio ?? 0;
+      }
+    }, 250);
+    return () => clearInterval(timer);
+  }, [player, inicio, fin]);
 
   return (
     <View className="h-full w-full">
@@ -240,12 +302,23 @@ export default function OfferDetailScreen() {
                           seleccionado ? "border-sage-500" : "border-line-soft",
                         ].join(" ")}
                       >
-                        <MediaImagen url={item.url} className="h-full w-full" />
+                        <MediaImagen
+                          url={item.url}
+                          tipo={item.tipo}
+                          className="h-full w-full"
+                        />
                         {item.tipo === "video" ? (
-                          <View className="absolute inset-0 items-center justify-center">
-                            <View className="h-8 w-8 items-center justify-center rounded-full bg-ink/60">
+                          <View className="absolute inset-0 items-center justify-center bg-ink/20">
+                            <View className="h-8 w-8 items-center justify-center rounded-full bg-ink/65">
                               <Icon name="video" size={14} className="text-white" />
                             </View>
+                            {item.duracion_segundos ? (
+                              <View className="absolute bottom-1 right-1 rounded-md bg-ink/75 px-1 py-0.5">
+                                <Text className="text-[9px] font-semibold text-white">
+                                  {item.duracion_segundos}s
+                                </Text>
+                              </View>
+                            ) : null}
                           </View>
                         ) : null}
                         {item.es_portada ? (
@@ -437,9 +510,37 @@ export default function OfferDetailScreen() {
   );
 }
 
-/** Imagen de la media (foto o póster del video). */
-function MediaImagen({ url, className = "" }: { url?: string | null; className?: string }) {
+/** Imagen de la media (foto o miniatura del video). */
+function MediaImagen({
+  url,
+  tipo = "foto",
+  className = "",
+}: {
+  url?: string | null;
+  tipo?: "foto" | "video";
+  className?: string;
+}) {
   if (!url) return <View className={`h-full w-full bg-surface-sunk ${className}`} />;
+  if (tipo === "video") {
+    const { inicio } = parseVideoTrimUrl(url);
+    if (Platform.OS === "web") {
+      return (
+        <View className={`overflow-hidden bg-ink ${className}`}>
+          <video
+            src={url}
+            muted
+            playsInline
+            preload="metadata"
+            onLoadedMetadata={(e) => {
+              e.currentTarget.currentTime = inicio ?? 0.1;
+            }}
+            style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }}
+          />
+        </View>
+      );
+    }
+    return <View className={`overflow-hidden bg-ink ${className}`} />;
+  }
   return (
     <View className={`overflow-hidden bg-surface-sunk ${className}`}>
       <Image source={{ uri: url }} className="h-full w-full" />
