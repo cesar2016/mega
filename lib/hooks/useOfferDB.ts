@@ -43,17 +43,16 @@ export function useOfertasPorProductor(productorId: string) {
         .from("ofertas")
         .select(`
           *,
-          profiles (nombre, avatar_url),
+          profiles (id, nombre, avatar_url, rol),
           oferta_media (${OFERTA_MEDIA_SELECT})
         `)
         .eq("productor_id", productorId)
-        .eq("estado", "activa")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data;
     },
-    enabled: !!productorId,
+    enabled: !!productorId && isSupabaseConfigured,
   });
 }
 
@@ -75,8 +74,18 @@ export function useOfertaById(ofertaId: string) {
       if (error) throw error;
       return data;
     },
-    enabled: !!ofertaId,
+    enabled: !!ofertaId && isSupabaseConfigured,
   });
+}
+
+/** Extrae el path interno del bucket `oferta_media` a partir de una URL pública. */
+export function storagePathFromPublicUrl(url?: string | null): string | null {
+  if (!url) return null;
+  const marker = "/storage/v1/object/public/oferta_media/";
+  const idx = url.indexOf(marker);
+  if (idx === -1) return null;
+  const path = url.slice(idx + marker.length).split("?")[0];
+  return path ? decodeURIComponent(path) : null;
 }
 
 export async function insertOferta(data: any): Promise<string | null> {
@@ -94,7 +103,7 @@ export async function insertOferta(data: any): Promise<string | null> {
   return inserted?.id ?? null;
 }
 
-export async function updateOferta(id: string, data: any) {
+export async function updateOferta(id: string, data: Record<string, any>) {
   const { error } = await supabase
     .from("ofertas")
     .update({
@@ -105,3 +114,35 @@ export async function updateOferta(id: string, data: any) {
 
   if (error) throw error;
 }
+
+/**
+ * Elimina una oferta y limpia de manera best-effort sus archivos en Storage.
+ * Las filas de `oferta_media`, `matches` y `solicitudes_flete` se eliminan en
+ * cascada por la base de datos (`ON DELETE CASCADE`).
+ */
+export async function deleteOferta(id: string, mediaUrls?: (string | null | undefined)[]) {
+  let urls = mediaUrls;
+
+  if (!urls) {
+    const { data: mediaRows } = await supabase
+      .from("oferta_media")
+      .select("url")
+      .eq("oferta_id", id);
+    urls = (mediaRows ?? []).map((r: { url?: string | null }) => r.url);
+  }
+
+  const { error } = await supabase.from("ofertas").delete().eq("id", id);
+  if (error) throw error;
+
+  const paths = (urls ?? [])
+    .map((u) => storagePathFromPublicUrl(u))
+    .filter((p): p is string => Boolean(p));
+
+  if (paths.length > 0) {
+    await supabase.storage
+      .from("oferta_media")
+      .remove(paths)
+      .catch(() => {});
+  }
+}
+

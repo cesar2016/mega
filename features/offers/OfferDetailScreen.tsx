@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { useOfertaById } from "lib/hooks/useOfferDB";
+import { deleteOferta, useOfertaById } from "lib/hooks/useOfferDB";
 import { showToast } from "lib/utils";
+import { useAuthStore } from "store/authStore";
 import { Icon } from "components/ui/Icon";
 import { Avatar, EmptyState } from "components/ui/Avatar";
 import { Badge, Card, SectionHeader } from "components/ui/Card";
@@ -15,6 +17,7 @@ import type { OfertaMediaRow } from "components/ui/OfertaMedia";
 
 type Oferta = {
   id: string;
+  productor_id?: string | null;
   categoria: string;
   raza?: string | null;
   cantidad: number;
@@ -27,7 +30,7 @@ type Oferta = {
   localidad?: string | null;
   estado?: string | null;
   created_at?: string | null;
-  profiles?: { nombre?: string | null; avatar_url?: string | null; rol?: string | null } | null;
+  profiles?: { id?: string | null; nombre?: string | null; avatar_url?: string | null; rol?: string | null } | null;
   oferta_media?: OfertaMediaRow[] | null;
 };
 
@@ -88,7 +91,11 @@ function Dato({ icon, label, value }: { icon: "boxes" | "scale" | "calendar" | "
 export default function OfferDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const user = useAuthStore((state) => state.user);
   const [activoId, setActivoId] = useState<string | null>(null);
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
 
   const { data, isLoading, error } = useOfertaById(String(id ?? ""));
 
@@ -118,6 +125,7 @@ export default function OfferDetailScreen() {
   }
 
   const oferta = data as Oferta;
+  const esPropia = Boolean(user?.id && oferta.productor_id === user.id);
   const todos = mediaOrdenado(oferta.oferta_media);
   const fotos = fotosDe(oferta.oferta_media);
   const videos = videosDe(oferta.oferta_media);
@@ -125,6 +133,30 @@ export default function OfferDetailScreen() {
   const activo = todos.find((item) => item.id === activoId) ?? portada ?? todos[0] ?? null;
 
   const irAlChat = () => showToast("La mensajería entre partes llega en la próxima versión", "info");
+  const irAEditar = () =>
+    router.push({ pathname: "/(main)/oferta-nueva", params: { id: oferta.id } });
+
+  const onEliminar = async () => {
+    try {
+      setEliminando(true);
+      const urls = (oferta.oferta_media ?? []).map((m) => m.url);
+      await deleteOferta(oferta.id, urls);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["ofertas_activas"] }),
+        queryClient.invalidateQueries({ queryKey: ["ofertas_productor"] }),
+        queryClient.invalidateQueries({ queryKey: ["matches"] }),
+        queryClient.invalidateQueries({ queryKey: ["oferta", oferta.id] }),
+      ]);
+      showToast("Publicación eliminada correctamente", "success");
+      router.replace("/(main)/tabs/ofertas");
+    } catch (err: any) {
+      console.error("Error al eliminar oferta:", err);
+      showToast(err?.message || "No se pudo eliminar la publicación", "error");
+    } finally {
+      setEliminando(false);
+      setConfirmandoEliminar(false);
+    }
+  };
 
   return (
     <View className="flex-1 bg-canvas">
@@ -139,13 +171,22 @@ export default function OfferDetailScreen() {
             : undefined
         }
         action={
-          <Button
-            label="Volver"
-            icon="arrowLeft"
-            variant="secondary"
-            onPress={() => router.back()}
-            className="hidden md:flex"
-          />
+          <View className="hidden flex-row items-center gap-2 md:flex">
+            {esPropia ? (
+              <Button
+                label="Editar"
+                icon="pencil"
+                variant="soft"
+                onPress={irAEditar}
+              />
+            ) : null}
+            <Button
+              label="Volver"
+              icon="arrowLeft"
+              variant="secondary"
+              onPress={() => router.back()}
+            />
+          </View>
         }
       >
         <View className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
@@ -298,6 +339,62 @@ export default function OfferDetailScreen() {
                 />
               </View>
             </Card>
+
+            {esPropia ? (
+              <Card className="gap-3 border-sage-200 bg-sage-50/40">
+                <View className="flex-row items-center gap-2">
+                  <Icon name="sliders" size={16} className="text-sage-600" />
+                  <Text className="text-sm font-bold text-ink">Gestionar tu publicación</Text>
+                </View>
+                <Text className="text-xs leading-4 text-ink-muted">
+                  Podés actualizar los datos, cambiar o agregar fotos y videos, o eliminar el lote.
+                </Text>
+
+                {confirmandoEliminar ? (
+                  <View className="gap-2 rounded-2xl border border-clay-200 bg-surface p-3">
+                    <Text className="text-xs font-semibold text-clay-700">
+                      ¿Confirmás eliminar esta publicación? Esta acción no se puede deshacer.
+                    </Text>
+                    <View className="flex-row gap-2">
+                      <Button
+                        label="Sí, eliminar"
+                        icon="trash"
+                        variant="danger"
+                        size="sm"
+                        loading={eliminando}
+                        onPress={onEliminar}
+                        className="flex-1"
+                      />
+                      <Button
+                        label="Cancelar"
+                        variant="secondary"
+                        size="sm"
+                        disabled={eliminando}
+                        onPress={() => setConfirmandoEliminar(false)}
+                        className="flex-1"
+                      />
+                    </View>
+                  </View>
+                ) : (
+                  <View className="flex-row gap-2">
+                    <Button
+                      label="Editar"
+                      icon="pencil"
+                      variant="primary"
+                      onPress={irAEditar}
+                      className="flex-1"
+                    />
+                    <Button
+                      label="Eliminar"
+                      icon="trash"
+                      variant="danger"
+                      onPress={() => setConfirmandoEliminar(true)}
+                      className="flex-1"
+                    />
+                  </View>
+                )}
+              </Card>
+            ) : null}
 
             <Card className="gap-3">
               <View className="flex-row items-center gap-3">

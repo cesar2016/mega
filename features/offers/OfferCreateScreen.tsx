@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -11,17 +11,26 @@ import {
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "lib/supabase";
+import {
+  deleteOferta,
+  storagePathFromPublicUrl,
+  updateOferta,
+  useOfertaById,
+} from "lib/hooks/useOfferDB";
 import { showToast } from "lib/utils";
 import { extensionForMime, toUploadBody } from "lib/upload";
 import { useAuthStore } from "store/authStore";
 import { Icon } from "components/ui/Icon";
+import { EmptyState } from "components/ui/Avatar";
 import { Badge, Card } from "components/ui/Card";
 import { Button } from "components/ui/Button";
 import { Input } from "components/ui/Input";
 import { Gradient, Screen } from "components/ui/Screen";
 import { MobileTopBar } from "components/layout/MobileTopBar";
+import type { OfertaMediaRow } from "components/ui/OfertaMedia";
 import {
   useOfferMedia,
   MAX_IMAGES,
@@ -40,6 +49,7 @@ const OfferSchema = z.object({
   descripcion: z.string().optional(),
   provincia: z.string().min(1, "Provincia requerida"),
   localidad: z.string().optional(),
+  estado: z.enum(["activa", "completada", "cancelada", "vencida"]).optional(),
 });
 
 const TIPOS_PRECIO: { valor: "por_kilo" | "por_cabeza" | "a_convenir"; label: string }[] = [
@@ -48,14 +58,26 @@ const TIPOS_PRECIO: { valor: "por_kilo" | "por_cabeza" | "a_convenir"; label: st
   { valor: "a_convenir", label: "A convenir" },
 ];
 
+const ESTADOS_OFERTA: { valor: "activa" | "completada" | "cancelada"; label: string }[] = [
+  { valor: "activa", label: "Activa" },
+  { valor: "completada", label: "Completada / Vendida" },
+  { valor: "cancelada", label: "Pausada / Cancelada" },
+];
+
 const CATEGORIAS = ["Novillos", "Vaquillonas", "Terneros", "Vacas", "Toros", "Corrales"];
 
 export default function OfferCreateScreen() {
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const ofertaId = id ? String(id) : "";
+  const esEdicion = Boolean(ofertaId);
+
   const user = useAuthStore((state) => state.user);
+  const queryClient = useQueryClient();
   const form = useForm();
   const {
-    addPhoto,
+    addPhotos,
     addVideo,
+    loadInitialMedia,
     removeMedia,
     clearAll,
     fotos,
@@ -66,10 +88,64 @@ export default function OfferCreateScreen() {
     isMaxReached,
   } = useOfferMedia();
   const router = useRouter();
-  const [submitting, setSubmitting] = React.useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
+
+  const {
+    data: ofertaExistente,
+    isLoading: cargandoOferta,
+    error: errorOferta,
+  } = useOfertaById(ofertaId);
+
+  const hidratadoRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!esEdicion) {
+      hidratadoRef.current = null;
+      return;
+    }
+    if (!ofertaExistente || hidratadoRef.current === ofertaExistente.id) return;
+
+    hidratadoRef.current = ofertaExistente.id;
+    form.reset({
+      categoria: ofertaExistente.categoria ?? "",
+      raza: ofertaExistente.raza ?? "",
+      cantidad:
+        ofertaExistente.cantidad !== null && ofertaExistente.cantidad !== undefined
+          ? Number(ofertaExistente.cantidad)
+          : undefined,
+      peso_promedio:
+        ofertaExistente.peso_promedio !== null && ofertaExistente.peso_promedio !== undefined
+          ? Number(ofertaExistente.peso_promedio)
+          : undefined,
+      edad: ofertaExistente.edad ?? "",
+      precio:
+        ofertaExistente.precio !== null && ofertaExistente.precio !== undefined
+          ? Number(ofertaExistente.precio)
+          : undefined,
+      tipo_precio: ofertaExistente.tipo_precio ?? "por_kilo",
+      descripcion: ofertaExistente.descripcion ?? "",
+      provincia: ofertaExistente.provincia ?? "",
+      localidad: ofertaExistente.localidad ?? "",
+      estado: ofertaExistente.estado ?? "activa",
+    });
+    loadInitialMedia((ofertaExistente.oferta_media ?? []) as OfertaMediaRow[]);
+  }, [esEdicion, ofertaExistente, form, loadInitialMedia]);
 
   // Suscribirse a los valores mantiene controlados los inputs
   const values = form.watch();
+
+  const invalidarConsultas = async (targetId?: string) => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["ofertas_activas"] }),
+      queryClient.invalidateQueries({ queryKey: ["ofertas_productor"] }),
+      queryClient.invalidateQueries({ queryKey: ["matches"] }),
+      targetId
+        ? queryClient.invalidateQueries({ queryKey: ["oferta", targetId] })
+        : Promise.resolve(),
+    ]);
+  };
 
   const onSubmit = async () => {
     if (!user) {
@@ -79,12 +155,23 @@ export default function OfferCreateScreen() {
 
     try {
       setSubmitting(true);
-      const validated = OfferSchema.parse(form.getValues());
+      const rawValues = form.getValues();
+      const validated = OfferSchema.parse({
+        ...rawValues,
+        raza: rawValues.raza || undefined,
+        edad: rawValues.edad || undefined,
+        descripcion: rawValues.descripcion || undefined,
+        localidad: rawValues.localidad || undefined,
+      });
 
-      // 1. Subir medios a Supabase Storage (direct upload con firmado)
+      // 1. Subir medios nuevos a Supabase Storage (los que ya tienen `url` se conservan)
       const urlPorId: Record<string, string> = {};
 
       for (const foto of fotos) {
+        if (foto.url) {
+          urlPorId[foto.id] = foto.url;
+          continue;
+        }
         const extension = extensionForMime(foto.mimeType, "jpg");
         const path = `${user.id}/${foto.id}.${extension}`;
         const { error: uploadError } = await supabase.storage
@@ -99,11 +186,14 @@ export default function OfferCreateScreen() {
         if (uploadError) throw uploadError;
 
         const { data } = supabase.storage.from("oferta_media").getPublicUrl(path);
-
         urlPorId[foto.id] = data.publicUrl;
       }
 
       for (const video of videos) {
+        if (video.url) {
+          urlPorId[video.id] = video.url;
+          continue;
+        }
         const extension = extensionForMime(video.mimeType, "mp4");
         const path = `${user.id}/${video.id}.${extension}`;
         const { error: uploadError } = await supabase.storage
@@ -117,49 +207,96 @@ export default function OfferCreateScreen() {
         if (uploadError) throw uploadError;
 
         const { data } = supabase.storage.from("oferta_media").getPublicUrl(path);
-
         urlPorId[video.id] = data.publicUrl;
       }
 
-      // 2. Insertar oferta en la base de datos
-      const { data: ofertaRow, error: dbError } = await supabase
-        .from("ofertas")
-        .insert({
-          productor_id: user.id,
+      let targetOfertaId = ofertaId;
+
+      if (esEdicion) {
+        // 2a. Actualizar oferta existente
+        await updateOferta(ofertaId, {
           categoria: validated.categoria,
-          raza: validated.raza,
+          raza: validated.raza ?? null,
           cantidad: validated.cantidad,
-          peso_promedio: validated.peso_promedio,
-          edad: validated.edad,
+          peso_promedio: validated.peso_promedio ?? null,
+          edad: validated.edad ?? null,
           precio: validated.precio,
           tipo_precio: validated.tipo_precio,
-          descripcion: validated.descripcion,
+          descripcion: validated.descripcion ?? null,
           provincia: validated.provincia,
-          localidad: validated.localidad,
-          ubicacion: null, // geografía point - requeriría geolocalización
-          estado: "activa",
-          vigencia: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 días
-        })
-        .select("id")
-        .single();
+          localidad: validated.localidad ?? null,
+          estado: validated.estado ?? "activa",
+        });
 
-      if (dbError) throw dbError;
+        // Limpiar de Storage los archivos antiguos que el productor quitó
+        const urlsAnteriores = ((ofertaExistente?.oferta_media ?? []) as OfertaMediaRow[])
+          .map((m) => m.url)
+          .filter((u): u is string => Boolean(u));
+        const urlsActuales = new Set(Object.values(urlPorId));
+        const pathsEliminados = urlsAnteriores
+          .filter((u) => !urlsActuales.has(u))
+          .map((u) => storagePathFromPublicUrl(u))
+          .filter((p): p is string => Boolean(p));
 
-      // 3. Asociar medios a la oferta (la foto elegida es la portada)
+        if (pathsEliminados.length > 0) {
+          await supabase.storage
+            .from("oferta_media")
+            .remove(pathsEliminados)
+            .catch(() => {});
+        }
+
+        // Reemplazar las filas de `oferta_media` de esta oferta con el nuevo orden y portada
+        const { error: delMediaError } = await supabase
+          .from("oferta_media")
+          .delete()
+          .eq("oferta_id", ofertaId);
+
+        if (delMediaError) throw delMediaError;
+      } else {
+        // 2b. Insertar nueva oferta en la base de datos
+        const { data: ofertaRow, error: dbError } = await supabase
+          .from("ofertas")
+          .insert({
+            productor_id: user.id,
+            categoria: validated.categoria,
+            raza: validated.raza ?? null,
+            cantidad: validated.cantidad,
+            peso_promedio: validated.peso_promedio ?? null,
+            edad: validated.edad ?? null,
+            precio: validated.precio,
+            tipo_precio: validated.tipo_precio,
+            descripcion: validated.descripcion ?? null,
+            provincia: validated.provincia,
+            localidad: validated.localidad ?? null,
+            ubicacion: null, // geografía point - requeriría geolocalización
+            estado: "activa",
+            vigencia: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 días
+          })
+          .select("id")
+          .single();
+
+        if (dbError) throw dbError;
+        targetOfertaId = ofertaRow.id;
+      }
+
+      // 3. Asociar medios a la oferta con orden secuencial (1..N) y portada única
+      const portadaEfectivaId =
+        fotos.some((f) => f.id === portadaId) ? portadaId : (fotos[0]?.id ?? null);
+
       const mediaRows = [
-        ...fotos.map((foto) => ({
-          oferta_id: ofertaRow.id,
+        ...fotos.map((foto, index) => ({
+          oferta_id: targetOfertaId,
           tipo: "foto" as const,
           url: urlPorId[foto.id],
-          orden: foto.orden,
-          es_portada: foto.id === portadaId,
+          orden: index + 1,
+          es_portada: foto.id === portadaEfectivaId,
         })),
-        ...videos.map((video) => ({
-          oferta_id: ofertaRow.id,
+        ...videos.map((video, index) => ({
+          oferta_id: targetOfertaId,
           tipo: "video" as const,
           url: urlPorId[video.id],
           duracion_segundos: video.duracion ?? null,
-          orden: video.orden,
+          orden: index + 1,
           es_portada: false,
         })),
       ];
@@ -172,18 +309,44 @@ export default function OfferCreateScreen() {
         if (mediaError) throw mediaError;
       }
 
-      clearAll();
-      router.replace("/(main)/tabs/feed");
-      showToast("Oferta publicada exitosamente!", "success");
+      await invalidarConsultas(targetOfertaId);
+
+      if (esEdicion) {
+        showToast("¡Publicación actualizada exitosamente!", "success");
+        router.replace(`/(main)/oferta/${targetOfertaId}`);
+      } else {
+        clearAll();
+        showToast("¡Oferta publicada exitosamente!", "success");
+        router.replace("/(main)/tabs/ofertas");
+      }
     } catch (err: any) {
-      console.error("Error al publicar oferta:", err);
-      showToast(err?.message || "Error al publicar la oferta", "error");
+      console.error("Error al guardar oferta:", err);
+      showToast(err?.message || "Error al guardar la publicación", "error");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Manejar selección de imagen desde la galería
+  const onEliminarOferta = async () => {
+    if (!esEdicion || !ofertaId) return;
+    try {
+      setEliminando(true);
+      const urls = ((ofertaExistente?.oferta_media ?? []) as OfertaMediaRow[]).map((m) => m.url);
+      await deleteOferta(ofertaId, urls);
+      await invalidarConsultas(ofertaId);
+      clearAll();
+      showToast("Publicación eliminada correctamente", "success");
+      router.replace("/(main)/tabs/ofertas");
+    } catch (err: any) {
+      console.error("Error al eliminar oferta:", err);
+      showToast(err?.message || "No se pudo eliminar la publicación", "error");
+    } finally {
+      setEliminando(false);
+      setConfirmandoEliminar(false);
+    }
+  };
+
+  // Selección múltiple de imágenes desde la galería
   const pickerFoto = useCallback(async () => {
     if (isMaxReached("foto")) {
       showToast("Máximo " + MAX_IMAGES + " fotos permitidas", "error");
@@ -191,24 +354,30 @@ export default function OfferCreateScreen() {
     }
 
     try {
+      const disponibles = Math.max(1, MAX_IMAGES - fotos.length);
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
-        allowsEditing: true,
-        aspect: [4, 3],
+        allowsMultipleSelection: true,
+        selectionLimit: disponibles,
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        addPhoto(result.assets[0].uri, result.assets[0].mimeType);
+        addPhotos(
+          result.assets.map((asset) => ({
+            uri: asset.uri,
+            mimeType: asset.mimeType,
+          }))
+        );
       }
     } catch (err) {
-      console.error("Error picking image:", err);
+      console.error("Error picking images:", err);
     }
-  }, [addPhoto, isMaxReached]);
+  }, [addPhotos, fotos.length, isMaxReached]);
 
   const pickerVideo = useCallback(async () => {
     if (isMaxReached("video")) {
-      showToast("Máximo " + MAX_VIDEOS + " videos permitidas", "error");
+      showToast("Máximo " + MAX_VIDEOS + " videos permitidos", "error");
       return;
     }
 
@@ -221,7 +390,8 @@ export default function OfferCreateScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const duracion = Math.round(result.assets[0].duration ?? 0);
+        const rawDur = result.assets[0].duration ?? 0;
+        const duracion = rawDur > 1000 ? Math.round(rawDur / 1000) : Math.round(rawDur);
         if (duracion > MAX_VIDEO_DURATION) {
           showToast(
             `Los videos deben tener como máximo ${MAX_VIDEO_DURATION} segundos`,
@@ -243,9 +413,69 @@ export default function OfferCreateScreen() {
     !!values.tipo_precio &&
     !!values.provincia;
 
+  if (esEdicion && cargandoOferta) {
+    return (
+      <View className="flex-1 items-center justify-center gap-3 bg-canvas">
+        <ActivityIndicator size="large" className="text-sage-500" />
+        <Text className="text-sm text-ink-muted">Cargando datos de la publicación...</Text>
+      </View>
+    );
+  }
+
+  if (esEdicion && (errorOferta || !ofertaExistente)) {
+    return (
+      <View className="flex-1 bg-canvas">
+        <MobileTopBar title="Editar oferta" onBack={() => router.back()} />
+        <Screen>
+          <EmptyState
+            icon="alert"
+            title="No encontramos la publicación para editar"
+            description={
+              errorOferta
+                ? String((errorOferta as Error).message ?? errorOferta)
+                : "Puede que haya sido eliminada."
+            }
+            action={
+              <Button
+                label="Volver a mis ofertas"
+                icon="arrowLeft"
+                onPress={() => router.replace("/(main)/tabs/ofertas")}
+              />
+            }
+          />
+        </Screen>
+      </View>
+    );
+  }
+
+  if (esEdicion && user && ofertaExistente && ofertaExistente.productor_id !== user.id) {
+    return (
+      <View className="flex-1 bg-canvas">
+        <MobileTopBar title="Editar oferta" onBack={() => router.back()} />
+        <Screen>
+          <EmptyState
+            icon="lock"
+            title="No tenés permiso para editar esta publicación"
+            description="Solo el productor que publicó el lote puede modificarlo o eliminarlo."
+            action={
+              <Button
+                label="Volver al detalle"
+                icon="arrowLeft"
+                onPress={() => router.replace(`/(main)/oferta/${ofertaId}`)}
+              />
+            }
+          />
+        </Screen>
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-canvas">
-      <MobileTopBar title="Publicar oferta" onBack={() => router.back()} />
+      <MobileTopBar
+        title={esEdicion ? "Editar publicación" : "Publicar oferta"}
+        onBack={() => router.back()}
+      />
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ flexGrow: 1 }}
@@ -253,9 +483,13 @@ export default function OfferCreateScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Screen
-          eyebrow="Nuevo lote"
-          title="Publicar oferta"
-          subtitle="Cargá los datos del lote: los compradores y fleteros los ven al instante."
+          eyebrow={esEdicion ? "Editar lote" : "Nuevo lote"}
+          title={esEdicion ? "Actualizar publicación" : "Publicar oferta"}
+          subtitle={
+            esEdicion
+              ? "Modificá los datos, el estado o las fotos de tu publicación."
+              : "Cargá los datos del lote: los compradores y fleteros los ven al instante."
+          }
           action={
             <Button
               label="Cancelar"
@@ -442,6 +676,41 @@ export default function OfferCreateScreen() {
                   numberOfLines={4}
                   icon="clipboard"
                 />
+
+                {esEdicion ? (
+                  <View className="gap-2 pt-1">
+                    <Text className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                      Estado de la publicación
+                    </Text>
+                    <View className="flex-row flex-wrap gap-2">
+                      {ESTADOS_OFERTA.map((item) => {
+                        const activo = (values.estado ?? "activa") === item.valor;
+                        return (
+                          <Pressable
+                            key={item.valor}
+                            onPress={() => form.setValue("estado", item.valor)}
+                            accessibilityRole="button"
+                            className={[
+                              "rounded-2xl border px-4 py-2.5",
+                              activo
+                                ? "border-sage-500 bg-sage-50"
+                                : "border-line bg-surface active:bg-surface-sunk",
+                            ].join(" ")}
+                          >
+                            <Text
+                              className={[
+                                "text-sm font-semibold",
+                                activo ? "text-sage-700" : "text-ink-soft",
+                              ].join(" ")}
+                            >
+                              {item.label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ) : null}
               </Card>
 
               <Card className="gap-5">
@@ -452,18 +721,20 @@ export default function OfferCreateScreen() {
                   <View className="flex-1">
                     <Text className="text-base font-bold text-ink">Galería de medios</Text>
                     <Text className="text-xs text-ink-muted">
-                      Hasta {MAX_IMAGES} fotos y {MAX_VIDEOS} videos de {MAX_VIDEO_DURATION}s
+                      Subida múltiple habilitada · Hasta {MAX_IMAGES} fotos y {MAX_VIDEOS} videos de{" "}
+                      {MAX_VIDEO_DURATION}s
                     </Text>
                   </View>
                 </View>
 
                 <View className="gap-4">
-                  <View className="gap-2">
+                  <View className="gap-1">
                     <Text className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-                      Fotos (hasta {MAX_IMAGES})
+                      Fotos ({fotos.length}/{MAX_IMAGES})
                     </Text>
                     <Text className="text-xs text-ink-muted">
-                      Tocá una foto para usarla de portada en la publicación.
+                      Podés seleccionar varias fotos a la vez. Tocá una foto para usarla de portada
+                      en la publicación.
                     </Text>
                   </View>
 
@@ -510,17 +781,17 @@ export default function OfferCreateScreen() {
                     <Pressable
                       onPress={pickerFoto}
                       disabled={isMaxReached("foto")}
-                      accessibilityLabel="Añadir foto"
+                      accessibilityLabel="Añadir fotos"
                       className={[
-                        "h-24 w-24 items-center justify-center gap-1 rounded-2xl border border-dashed",
+                        "h-24 w-28 items-center justify-center gap-1 rounded-2xl border border-dashed px-2",
                         isMaxReached("foto")
                           ? "border-line bg-surface-sunk opacity-50"
                           : "border-sage-300 bg-sage-50 active:bg-sage-100",
                       ].join(" ")}
                     >
                       <Icon name="camera" size={20} className="text-sage-600" />
-                      <Text className="text-[10px] font-semibold text-sage-700">
-                        {fotos.length}/{MAX_IMAGES}
+                      <Text className="text-center text-[10px] font-semibold text-sage-700">
+                        Elegir fotos ({fotos.length}/{MAX_IMAGES})
                       </Text>
                     </Pressable>
                   </View>
@@ -605,6 +876,9 @@ export default function OfferCreateScreen() {
                       [values.localidad, values.provincia].filter(Boolean).join(", ") || "—"
                     }
                   />
+                  {esEdicion ? (
+                    <ResumenFila label="Estado" value={values.estado || "activa"} />
+                  ) : null}
                 </View>
 
                 <View className="flex-row items-center gap-2">
@@ -622,7 +896,7 @@ export default function OfferCreateScreen() {
                   <ActivityIndicator className="text-sage-500" />
                 ) : (
                   <Button
-                    label="Publicar oferta"
+                    label={esEdicion ? "Guardar cambios" : "Publicar oferta"}
                     icon="checkCircle"
                     size="lg"
                     fullWidth
@@ -632,8 +906,9 @@ export default function OfferCreateScreen() {
                 )}
 
                 <Text className="text-center text-[11px] leading-4 text-ink-muted">
-                  La oferta queda activa durante 30 días y se cruza automáticamente con las
-                  demandas del mercado.
+                  {esEdicion
+                    ? "Al guardar cambios se actualiza la publicación y se recalculan los cruces con las demandas activas."
+                    : "La oferta queda activa durante 30 días y se cruza automáticamente con las demandas del mercado."}
                 </Text>
 
                 {Platform.OS === "web" ? (
@@ -642,6 +917,55 @@ export default function OfferCreateScreen() {
                   </Text>
                 ) : null}
               </Card>
+
+              {esEdicion ? (
+                <Card className="gap-3 border-clay-200 bg-clay-50/40">
+                  <View className="flex-row items-center gap-2">
+                    <Icon name="trash" size={16} className="text-clay-600" />
+                    <Text className="text-sm font-bold text-ink">Eliminar publicación</Text>
+                  </View>
+                  <Text className="text-xs leading-4 text-ink-muted">
+                    Si retirás el lote del mercado, se eliminará la publicación junto con sus
+                    fotos, videos y cruces asociados.
+                  </Text>
+
+                  {confirmandoEliminar ? (
+                    <View className="gap-2 pt-1">
+                      <Text className="text-xs font-semibold text-clay-700">
+                        ¿Confirmás que querés eliminar esta publicación definitivamente?
+                      </Text>
+                      <View className="flex-row gap-2">
+                        <Button
+                          label="Sí, eliminar"
+                          icon="trash"
+                          variant="danger"
+                          size="sm"
+                          loading={eliminando}
+                          onPress={onEliminarOferta}
+                          className="flex-1"
+                        />
+                        <Button
+                          label="Cancelar"
+                          variant="secondary"
+                          size="sm"
+                          disabled={eliminando}
+                          onPress={() => setConfirmandoEliminar(false)}
+                          className="flex-1"
+                        />
+                      </View>
+                    </View>
+                  ) : (
+                    <Button
+                      label="Eliminar publicación"
+                      icon="trash"
+                      variant="danger"
+                      size="md"
+                      fullWidth
+                      onPress={() => setConfirmandoEliminar(true)}
+                    />
+                  )}
+                </Card>
+              ) : null}
             </View>
           </View>
         </Screen>

@@ -1,8 +1,10 @@
 import React from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { useOfertasPorProductor } from "lib/hooks/useOfferDB";
+import { useQueryClient } from "@tanstack/react-query";
+import { deleteOferta, useOfertasPorProductor } from "lib/hooks/useOfferDB";
 import { useResponsive } from "lib/hooks/useResponsive";
+import { showToast } from "lib/utils";
 import { useAuthStore } from "store/authStore";
 import { Icon } from "components/ui/Icon";
 import { EmptyState } from "components/ui/Avatar";
@@ -15,10 +17,12 @@ import { OfferCard } from "features/offers/OfferCard";
 import type { OfertaResumen } from "features/offers/OfferCard";
 
 /**
- * Mis ofertas (productor). Lista las publicaciones del usuario autenticado.
+ * Mis ofertas (productor). Lista las publicaciones del usuario autenticado
+ * y permite editarlas o eliminarlas directamente.
  */
 export default function OfertasScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const { width } = useResponsive();
 
@@ -28,6 +32,25 @@ export default function OfertasScreen() {
 
   const irAPublicar = () => router.push("/(main)/oferta-nueva");
   const irAlDetalle = (id: string) => router.push(`/(main)/oferta/${id}`);
+  const irAEditar = (id: string) =>
+    router.push({ pathname: "/(main)/oferta-nueva", params: { id } });
+
+  const handleEliminar = async (oferta: OfertaResumen) => {
+    try {
+      const urls = (oferta.oferta_media ?? []).map((m) => m.url);
+      await deleteOferta(oferta.id, urls);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["ofertas_activas"] }),
+        queryClient.invalidateQueries({ queryKey: ["ofertas_productor"] }),
+        queryClient.invalidateQueries({ queryKey: ["matches"] }),
+        queryClient.invalidateQueries({ queryKey: ["oferta", oferta.id] }),
+      ]);
+      showToast("Publicación eliminada correctamente", "success");
+    } catch (err: any) {
+      console.error("Error al eliminar oferta:", err);
+      showToast(err?.message || "No se pudo eliminar la publicación", "error");
+    }
+  };
 
   if (isLoading) {
     return (
@@ -47,7 +70,7 @@ export default function OfertasScreen() {
       <Screen
         eyebrow="Panel del productor"
         title="Mis ofertas"
-        subtitle="Gestioná los lotes que publicaste y seguí su estado en el mercado."
+        subtitle="Gestioná los lotes que publicaste: podés editarlos, actualizar sus fotos o eliminarlos."
         onRefresh={() => refetch()}
         refreshing={isRefetching}
         action={
@@ -80,6 +103,8 @@ export default function OfertasScreen() {
                 key={oferta.id}
                 oferta={oferta}
                 onPress={() => irAlDetalle(oferta.id)}
+                onEdit={() => irAEditar(oferta.id)}
+                onDelete={() => handleEliminar(oferta)}
               />
             ))}
           </Grid>
@@ -103,3 +128,4 @@ export default function OfertasScreen() {
     </View>
   );
 }
+

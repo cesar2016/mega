@@ -1,9 +1,11 @@
 import React from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { useOfertasActivas } from "lib/hooks/useOfferDB";
+import { useQueryClient } from "@tanstack/react-query";
+import { deleteOferta, useOfertasActivas } from "lib/hooks/useOfferDB";
 import { isSupabaseConfigured } from "lib/supabase";
 import { useResponsive } from "lib/hooks/useResponsive";
+import { showToast } from "lib/utils";
 import { useAuthStore } from "store/authStore";
 import { Icon } from "components/ui/Icon";
 import { EmptyState } from "components/ui/Avatar";
@@ -16,6 +18,7 @@ import type { OfertaResumen } from "features/offers/OfferCard";
 
 export default function FeedScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const profile = useAuthStore((state) => state.profile);
   const { width } = useResponsive();
 
@@ -29,6 +32,25 @@ export default function FeedScreen() {
 
   const irAPublicar = () => router.push("/(main)/oferta-nueva");
   const irAlDetalle = (id: string) => router.push(`/(main)/oferta/${id}`);
+  const irAEditar = (id: string) =>
+    router.push({ pathname: "/(main)/oferta-nueva", params: { id } });
+
+  const handleEliminar = async (oferta: OfertaResumen) => {
+    try {
+      const urls = (oferta.oferta_media ?? []).map((m) => m.url);
+      await deleteOferta(oferta.id, urls);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["ofertas_activas"] }),
+        queryClient.invalidateQueries({ queryKey: ["ofertas_productor"] }),
+        queryClient.invalidateQueries({ queryKey: ["matches"] }),
+        queryClient.invalidateQueries({ queryKey: ["oferta", oferta.id] }),
+      ]);
+      showToast("Publicación eliminada correctamente", "success");
+    } catch (err: any) {
+      console.error("Error al eliminar oferta:", err);
+      showToast(err?.message || "No se pudo eliminar la publicación", "error");
+    }
+  };
 
   if (!profile) {
     return (
@@ -123,16 +145,22 @@ export default function FeedScreen() {
           />
         ) : (
           <Grid columns={columns}>
-            {lista.map((oferta) => (
-              <OfferCard
-                key={oferta.id}
-                oferta={oferta}
-                onPress={() => irAlDetalle(oferta.id)}
-              />
-            ))}
+            {lista.map((oferta) => {
+              const esPropia = Boolean(profile?.id && oferta.productor_id === profile.id);
+              return (
+                <OfferCard
+                  key={oferta.id}
+                  oferta={oferta}
+                  onPress={() => irAlDetalle(oferta.id)}
+                  onEdit={esPropia ? () => irAEditar(oferta.id) : undefined}
+                  onDelete={esPropia ? () => handleEliminar(oferta) : undefined}
+                />
+              );
+            })}
           </Grid>
         )}
       </Screen>
     </View>
   );
 }
+
