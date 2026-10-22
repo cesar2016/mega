@@ -76,7 +76,15 @@ const ESTADOS_OFERTA: { valor: "activa" | "completada" | "cancelada"; label: str
   { valor: "cancelada", label: "Pausada / Cancelada" },
 ];
 
-const CATEGORIAS = ["Novillos", "Vaquillonas", "Terneros", "Vacas", "Toros", "Corrales"];
+const CATEGORIAS = [
+  "Novillos",
+  "Vaquillonas",
+  "Terneros",
+  "Vacas",
+  "Toros",
+  "Conserva",
+  "Variados",
+];
 
 export default function OfferCreateScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();

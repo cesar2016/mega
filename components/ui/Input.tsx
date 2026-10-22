@@ -84,7 +84,7 @@ export function Input({
           numberOfLines={numberOfLines}
           editable={editable}
           className={[
-            "flex-1 text-base text-ink",
+            "flex-1 bg-transparent text-base text-ink outline-none focus:outline-none",
             multiline ? "min-h-[88px] text-left" : "",
             inputClassName,
           ].join(" ")}

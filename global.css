@@ -21,6 +21,17 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Quitar el recuadro negro nativo del navegador en inputs (el contenedor ya marca el foco). */
+input,
+textarea,
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 /* Scrollbar discreto en escritorio. */
 ::-webkit-scrollbar {
   width: 10px;
