@@ -63,10 +63,17 @@ export function OfferCard({
 }) {
   const [confirmando, setConfirmando] = useState(false);
   const [eliminando, setEliminando] = useState(false);
+  const [hovered, setHovered] = useState(false);
 
   const portada = portadaDe(oferta.oferta_media);
   const fotos = fotosDe(oferta.oferta_media).length;
   const videos = videosDe(oferta.oferta_media).length;
+  const resumenMedia = [
+    fotos > 0 ? `${fotos} foto${fotos === 1 ? "" : "s"}` : "",
+    videos > 0 ? `${videos} video${videos === 1 ? "" : "s"}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   const handleConfirmDelete = async () => {
     if (!onDelete) return;
@@ -81,9 +88,17 @@ export function OfferCard({
 
   return (
     <View className="w-full">
-      <Card className="gap-0 overflow-hidden" padded={false}>
+      <Card
+        className={[
+          "gap-0 overflow-hidden",
+          hovered ? "border-sage-300 shadow-card" : "",
+        ].join(" ")}
+        padded={false}
+      >
         <Pressable
           onPress={onPress}
+          onHoverIn={() => setHovered(true)}
+          onHoverOut={() => setHovered(false)}
           accessibilityRole="button"
           accessibilityLabel={`Ver publicación de ${oferta.categoria}`}
           className="w-full active:opacity-90"
@@ -92,17 +107,25 @@ export function OfferCard({
           <View className="relative">
             <MediaCover
               url={portada?.url}
+              media={oferta.oferta_media}
+              hovered={hovered}
               categoria={oferta.categoria}
               className="h-40"
               rounded="rounded-none"
             />
 
-            {fotos + videos > 1 ? (
-              <View className="absolute bottom-2 right-2 flex-row items-center gap-1 rounded-lg bg-ink/60 px-2 py-1">
-                <Icon name="image" size={12} className="text-white" />
+            {fotos > 1 || videos > 0 ? (
+              <View
+                pointerEvents="none"
+                className="absolute bottom-2 right-2 flex-row items-center gap-1 rounded-lg bg-ink/65 px-2 py-1"
+              >
+                <Icon
+                  name={videos > 0 ? "video" : "image"}
+                  size={12}
+                  className="text-white"
+                />
                 <Text className="text-[10px] font-semibold text-white">
-                  {fotos} foto{fotos === 1 ? "" : "s"}
-                  {videos > 0 ? ` · ${videos} video${videos === 1 ? "" : "s"}` : ""}
+                  {hovered && videos > 0 ? "Reproduciendo video" : resumenMedia}
                 </Text>
               </View>
             ) : null}

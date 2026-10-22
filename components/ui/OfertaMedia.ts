@@ -36,6 +36,17 @@ export function portadaDe(media?: OfertaMediaRow[] | null): OfertaMediaRow | nul
 }
 
 /**
+ * Fotos ordenadas dejando la foto de portada en primer lugar, para usar en
+ * carruseles o previsualizaciones al pasar el cursor.
+ */
+export function fotosConPortadaPrimero(media?: OfertaMediaRow[] | null): OfertaMediaRow[] {
+  const fotos = fotosDe(media);
+  if (fotos.length <= 1) return fotos;
+  const portada = fotos.find((foto) => foto.es_portada) ?? fotos[0];
+  return [portada, ...fotos.filter((foto) => foto.id !== portada.id)];
+}
+
+/**
  * Extrae el rango de recorte `#t=inicio,fin` (Media Fragments URI) si existe en la URL.
  */
 export function parseVideoTrimUrl(url?: string | null): {

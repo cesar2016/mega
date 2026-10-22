@@ -66,6 +66,8 @@ export function MatchCard({
             <View className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl">
               <MediaCover
                 url={portada?.url}
+                media={oferta?.oferta_media}
+                showIndicators={false}
                 categoria={oferta?.categoria}
                 className="h-20 w-20"
                 rounded="rounded-2xl"
