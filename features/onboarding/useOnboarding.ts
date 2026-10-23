@@ -25,7 +25,7 @@ export function useOnboarding() {
   const [formState, setFormState] = useState<OnboardingFormValues>({
     nombre: profile?.nombre || (user as any)?.user_metadata?.nombre || "",
     telefono: profile?.telefono || "",
-    rol: "comprador",
+    rol: "productor",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

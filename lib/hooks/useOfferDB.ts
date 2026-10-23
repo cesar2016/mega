@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase, isSupabaseConfigured } from "lib/supabase";
+import { maskNombreUsuario } from "lib/utils";
+import { useAuthStore } from "store/authStore";
 
 /** Campos de media que se embeben en las consultas de ofertas. */
 export const OFERTA_MEDIA_SELECT = `
@@ -11,6 +13,23 @@ export const OFERTA_MEDIA_SELECT = `
   duracion_segundos
 `;
 
+function sanitizarOferta<T extends Record<string, any>>(oferta: T): T {
+  if (!oferta?.profiles) return oferta;
+  const miId = useAuthStore.getState().user?.id;
+  const esPropia = Boolean(
+    miId && (oferta.productor_id === miId || oferta.profiles.id === miId)
+  );
+  return {
+    ...oferta,
+    profiles: {
+      id: oferta.profiles.id ?? null,
+      nombre: maskNombreUsuario(oferta.profiles.nombre, "Usu****", esPropia),
+      avatar_url: null,
+      rol: oferta.profiles.rol ?? null,
+    },
+  };
+}
+
 export function useOfertasActivas(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["ofertas_activas"],
@@ -19,14 +38,14 @@ export function useOfertasActivas(options?: { enabled?: boolean }) {
         .from("ofertas")
         .select(`
           *,
-          profiles (id, nombre, avatar_url, rol),
+          profiles (id, nombre, rol),
           oferta_media (${OFERTA_MEDIA_SELECT})
         `)
         .eq("estado", "activa")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data;
+      return (data ?? []).map(sanitizarOferta);
     },
     // Sin credenciales reales no hay a quién preguntar: la app queda en modo demo.
     enabled: (options?.enabled ?? true) && isSupabaseConfigured,
@@ -43,14 +62,14 @@ export function useOfertasPorProductor(productorId: string) {
         .from("ofertas")
         .select(`
           *,
-          profiles (id, nombre, avatar_url, rol),
+          profiles (id, nombre, rol),
           oferta_media (${OFERTA_MEDIA_SELECT})
         `)
         .eq("productor_id", productorId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data;
+      return (data ?? []).map(sanitizarOferta);
     },
     enabled: !!productorId && isSupabaseConfigured,
   });
@@ -65,14 +84,14 @@ export function useOfertaById(ofertaId: string) {
         .from("ofertas")
         .select(`
           *,
-          profiles (id, nombre, avatar_url, rol),
+          profiles (id, nombre, rol),
           oferta_media (${OFERTA_MEDIA_SELECT})
         `)
         .eq("id", ofertaId)
         .single();
 
       if (error) throw error;
-      return data;
+      return data ? sanitizarOferta(data) : data;
     },
     enabled: !!ofertaId && isSupabaseConfigured,
   });

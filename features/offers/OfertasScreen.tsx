@@ -68,9 +68,9 @@ export default function OfertasScreen() {
       <MobileTopBar title="Mis ofertas" action onActionPress={irAPublicar} />
 
       <Screen
-        eyebrow="Panel del productor"
+        eyebrow="Tus publicaciones"
         title="Mis ofertas"
-        subtitle="Gestioná los lotes que publicaste: podés editarlos, actualizar sus fotos o eliminarlos."
+        subtitle="Gestioná los lotes que publicaste para la venta: podés editarlos, actualizar sus fotos o eliminarlos."
         onRefresh={() => refetch()}
         refreshing={isRefetching}
         action={

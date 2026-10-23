@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { maskNombreUsuario } from "lib/utils";
 import { Icon } from "components/ui/Icon";
 import { Avatar } from "components/ui/Avatar";
 import { Badge, Card } from "components/ui/Card";
@@ -190,12 +191,20 @@ export function OfferCard({
 
             <View className="flex-row items-center gap-2.5 border-t border-line-soft pt-3">
               <Avatar
-                uri={oferta.profiles?.avatar_url}
-                nombre={oferta.profiles?.nombre}
+                uri={null}
+                nombre={maskNombreUsuario(
+                  oferta.profiles?.nombre,
+                  "Usu****",
+                  Boolean(onEdit || onDelete)
+                )}
                 size={32}
               />
               <Text className="flex-1 text-xs font-medium text-ink-soft" numberOfLines={1}>
-                {oferta.profiles?.nombre || "Productor"}
+                {maskNombreUsuario(
+                  oferta.profiles?.nombre,
+                  "Usu****",
+                  Boolean(onEdit || onDelete)
+                )}
               </Text>
               <View className="flex-row items-center gap-1 text-sage-600">
                 <Text className="text-xs font-bold">Ver publicación</Text>

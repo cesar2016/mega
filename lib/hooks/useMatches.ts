@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase, isSupabaseConfigured } from "lib/supabase";
 import { OFERTA_MEDIA_SELECT } from "lib/hooks/useOfferDB";
+import { maskNombreUsuario } from "lib/utils";
 import type { DemandaMatch, OfertaMatch } from "lib/matching";
 
 export type EstadoMatch = "pendiente" | "aceptado" | "rechazado" | "finalizado";
@@ -36,7 +37,7 @@ const MATCH_SELECT = `
     provincia,
     localidad,
     estado,
-    profiles (id, nombre, avatar_url, rol),
+    profiles (id, nombre, rol),
     oferta_media (${OFERTA_MEDIA_SELECT})
   ),
   demandas (
@@ -55,9 +56,39 @@ const MATCH_SELECT = `
     localidad,
     radio_km,
     estado,
-    profiles (id, nombre, avatar_url, rol)
+    profiles (id, nombre, rol)
   )
 `;
+
+function sanitizarMatch(row: MatchRow): MatchRow {
+  return {
+    ...row,
+    ofertas: row.ofertas
+      ? {
+          ...row.ofertas,
+          profiles: row.ofertas.profiles
+            ? {
+                ...row.ofertas.profiles,
+                nombre: maskNombreUsuario(row.ofertas.profiles.nombre),
+                avatar_url: null,
+              }
+            : null,
+        }
+      : null,
+    demandas: row.demandas
+      ? {
+          ...row.demandas,
+          profiles: row.demandas.profiles
+            ? {
+                ...row.demandas.profiles,
+                nombre: maskNombreUsuario(row.demandas.profiles.nombre),
+                avatar_url: null,
+              }
+            : null,
+        }
+      : null,
+  };
+}
 
 /**
  * Cruces del usuario actual: los lotes que matchean con sus demandas y las
@@ -74,7 +105,7 @@ export function useMatches(options?: { enabled?: boolean }) {
         .order("creado_en", { ascending: false });
 
       if (error) throw error;
-      return (data ?? []) as unknown as MatchRow[];
+      return ((data ?? []) as unknown as MatchRow[]).map(sanitizarMatch);
     },
     enabled: (options?.enabled ?? true) && isSupabaseConfigured,
     retry: isSupabaseConfigured ? 3 : false,

@@ -7,6 +7,7 @@ import { Button } from "components/ui/Button";
 import { MediaCover } from "components/ui/MediaCover";
 import { portadaDe } from "components/ui/OfertaMedia";
 import { formatPrecioOferta } from "features/offers/OfferCard";
+import { maskNombreUsuario } from "lib/utils";
 import { nivelMatch, razonesMatch } from "lib/matching";
 import type { RazonMatch } from "lib/matching";
 import type { MatchRow } from "lib/hooks/useMatches";
@@ -56,7 +57,9 @@ export function MatchCard({
   const nivel = nivelMatch(match.puntaje);
   const esOferta = contraparte === "oferta";
   const portada = portadaDe(oferta?.oferta_media ?? null);
-  const contraparteNombre = esOferta ? oferta?.profiles?.nombre : demanda?.profiles?.nombre;
+  const contraparteNombre = maskNombreUsuario(
+    esOferta ? oferta?.profiles?.nombre : demanda?.profiles?.nombre
+  );
 
   return (
     <Card className="gap-0 overflow-hidden" padded={false}>
@@ -105,12 +108,12 @@ export function MatchCard({
 
             <View className="flex-row items-center gap-2">
               <Avatar
-                uri={esOferta ? oferta?.profiles?.avatar_url : demanda?.profiles?.avatar_url}
+                uri={null}
                 nombre={contraparteNombre}
                 size={22}
               />
               <Text className="flex-1 text-xs text-ink-muted" numberOfLines={1}>
-                {contraparteNombre || (esOferta ? "Productor" : "Comprador")}
+                {contraparteNombre}
               </Text>
             </View>
           </View>

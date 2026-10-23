@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { deleteOferta, useOfertaById } from "lib/hooks/useOfferDB";
-import { showToast } from "lib/utils";
+import { maskNombreUsuario, showToast } from "lib/utils";
 import { useAuthStore } from "store/authStore";
 import { Icon } from "components/ui/Icon";
 import { Avatar, EmptyState } from "components/ui/Avatar";
@@ -472,15 +472,19 @@ export default function OfferDetailScreen() {
             <Card className="gap-3">
               <View className="flex-row items-center gap-3">
                 <Avatar
-                  uri={oferta.profiles?.avatar_url}
-                  nombre={oferta.profiles?.nombre}
+                  uri={null}
+                  nombre={maskNombreUsuario(oferta.profiles?.nombre, "Usu****", esPropia)}
                   size={44}
                 />
                 <View className="flex-1 gap-0.5">
                   <Text className="text-sm font-bold text-ink">
-                    {oferta.profiles?.nombre || "Productor"}
+                    {maskNombreUsuario(oferta.profiles?.nombre, "Usu****", esPropia)}
                   </Text>
-                  <Text className="text-xs text-ink-muted">Productor del lote</Text>
+                  <Text className="text-xs text-ink-muted">
+                    {esPropia
+                      ? `Los demás usuarios te ven como ${maskNombreUsuario(oferta.profiles?.nombre)}`
+                      : "Usuario verificado · Datos protegidos"}
+                  </Text>
                 </View>
                 <Icon name="badgeCheck" size={18} className="text-sage-500" />
               </View>

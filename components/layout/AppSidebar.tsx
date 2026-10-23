@@ -9,8 +9,8 @@ import { Logo } from "components/ui/Logo";
 import { NAV_ITEMS, activeNavItem } from "./navItems";
 
 const ROLE_LABEL: Record<string, string> = {
-  productor: "Productor",
-  comprador: "Comprador",
+  productor: "Compra y venta",
+  comprador: "Compra y venta",
   fletero: "Transportista",
   admin: "Administrador",
 };

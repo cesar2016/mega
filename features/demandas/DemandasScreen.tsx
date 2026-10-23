@@ -4,7 +4,7 @@ import { useDemandasActivas } from "lib/hooks/useDemandaDB";
 import { useResponsive } from "lib/hooks/useResponsive";
 import { isSupabaseConfigured } from "lib/supabase";
 import { useAuthStore } from "store/authStore";
-import { showToast } from "lib/utils";
+import { maskNombreUsuario, showToast } from "lib/utils";
 import { Icon } from "components/ui/Icon";
 import { Avatar, EmptyState } from "components/ui/Avatar";
 import { Badge, Card } from "components/ui/Card";
@@ -15,6 +15,7 @@ import { MobileTopBar } from "components/layout/MobileTopBar";
 
 type Demanda = {
   id: string;
+  comprador_id?: string | null;
   categoria: string;
   raza?: string | null;
   cantidad_min?: number | null;
@@ -26,7 +27,7 @@ type Demanda = {
   provincia?: string | null;
   localidad?: string | null;
   radio_km?: number | null;
-  profiles?: { nombre?: string | null; avatar_url?: string | null } | null;
+  profiles?: { id?: string | null; nombre?: string | null; avatar_url?: string | null } | null;
 };
 
 function rangoPeso(demanda: Demanda) {
@@ -73,9 +74,9 @@ export default function DemandasScreen() {
       <MobileTopBar title="Demandas" />
 
       <Screen
-        eyebrow="Panel del comprador"
+        eyebrow="Búsquedas de hacienda"
         title="Demandas activas"
-        subtitle="Lo que el mercado está buscando ahora. Cada demanda genera matches automáticos con los lotes publicados."
+        subtitle="Lo que el mercado está buscando comprar ahora. Cada demanda genera matches automáticos con los lotes publicados."
         onRefresh={() => refetch()}
         refreshing={isRefetching}
         action={
@@ -182,9 +183,27 @@ export default function DemandasScreen() {
                 </View>
 
                 <View className="flex-row items-center gap-2 border-t border-line-soft pt-3">
-                  <Avatar uri={item.profiles?.avatar_url} nombre={item.profiles?.nombre} size={30} />
+                  <Avatar
+                    uri={null}
+                    nombre={maskNombreUsuario(
+                      item.profiles?.nombre,
+                      "Usu****",
+                      Boolean(
+                        profile?.id &&
+                          (item.comprador_id === profile.id || item.profiles?.id === profile.id)
+                      )
+                    )}
+                    size={30}
+                  />
                   <Text className="flex-1 text-xs font-medium text-ink-soft" numberOfLines={1}>
-                    {item.profiles?.nombre || "Comprador"}
+                    {maskNombreUsuario(
+                      item.profiles?.nombre,
+                      "Usu****",
+                      Boolean(
+                        profile?.id &&
+                          (item.comprador_id === profile.id || item.profiles?.id === profile.id)
+                      )
+                    )}
                   </Text>
                   <View className="flex-row items-center gap-1 text-sky-600">
                     <Text className="text-xs font-bold">Ver demanda</Text>

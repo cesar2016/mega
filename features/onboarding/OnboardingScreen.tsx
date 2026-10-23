@@ -9,27 +9,23 @@ import { Gradient } from "components/ui/Screen";
 import { Logo } from "components/ui/Logo";
 
 const ROLES: {
-  valor: "productor" | "comprador" | "fletero";
+  valor: "productor" | "fletero";
   titulo: string;
   descripcion: string;
   icon: IconName;
 }[] = [
   {
     valor: "productor",
-    titulo: "Productor",
-    descripcion: "Vendo lotes de hacienda y quiero llegar a más compradores.",
-    icon: "tractor",
-  },
-  {
-    valor: "comprador",
-    titulo: "Comprador",
-    descripcion: "Busco hacienda para comprar, con matching automático por categoría y peso.",
-    icon: "shoppingCart",
+    titulo: "Compra y venta de hacienda",
+    descripcion:
+      "Publicá tus propios lotes para vender y buscá hacienda para comprar en el mercado con matching automático.",
+    icon: "beef",
   },
   {
     valor: "fletero",
-    titulo: "Fletero",
-    descripcion: "Ofrezco transporte y quiero recibir pedidos de carga en mi radio.",
+    titulo: "Fletero / Transportista",
+    descripcion:
+      "Ofrezco transporte de hacienda y quiero recibir pedidos de carga en mi radio de cobertura.",
     icon: "truck",
   },
 ];

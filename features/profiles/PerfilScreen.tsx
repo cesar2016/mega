@@ -1,7 +1,7 @@
 import React from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useAuthStore } from "store/authStore";
-import { showToast } from "lib/utils";
+import { maskNombreUsuario, showToast } from "lib/utils";
 import { Icon } from "components/ui/Icon";
 import { Avatar } from "components/ui/Avatar";
 import { Badge, Card } from "components/ui/Card";
@@ -11,15 +11,15 @@ import { Gradient, Screen } from "components/ui/Screen";
 import { MobileTopBar } from "components/layout/MobileTopBar";
 
 const ROLE_LABEL: Record<string, string> = {
-  productor: "Productor",
-  comprador: "Comprador",
+  productor: "Compra y venta de hacienda",
+  comprador: "Compra y venta de hacienda",
   fletero: "Transportista",
   admin: "Administrador",
 };
 
-const ROLE_ICON: Record<string, "tractor" | "shoppingCart" | "truck" | "shield"> = {
-  productor: "tractor",
-  comprador: "shoppingCart",
+const ROLE_ICON: Record<string, "beef" | "truck" | "shield"> = {
+  productor: "beef",
+  comprador: "beef",
   fletero: "truck",
   admin: "shield",
 };
@@ -93,9 +93,9 @@ export default function PerfilScreen() {
       <MobileTopBar title="Perfil" />
 
       <Screen
-        eyebrow="Tu cuenta"
+        eyebrow="Tu cuenta (privada)"
         title="Perfil"
-        subtitle="Mantené tus datos al día para que la contraparte te pueda contactar."
+        subtitle={`Tus datos personales nunca se muestran a otros usuarios. En el mercado te ven como ${maskNombreUsuario(profile.nombre)}.`}
         action={
           <Button
             label={editing ? "Cancelar" : "Editar perfil"}
@@ -118,6 +118,9 @@ export default function PerfilScreen() {
                 <Text className="text-xl font-extrabold tracking-tight text-ink">
                   {profile.nombre || "Sin nombre"}
                 </Text>
+                <Badge tone="neutral" icon="lock">
+                  {`Público: ${maskNombreUsuario(profile.nombre)}`}
+                </Badge>
                 {profile.verificado ? (
                   <Badge tone="sage" icon="badgeCheck">
                     Verificado
@@ -212,7 +215,7 @@ export default function PerfilScreen() {
                   label="Teléfono"
                   value={profile.telefono || "Sin cargar"}
                 />
-                {rol === "productor" ? (
+                {rol !== "fletero" ? (
                   <Dato icon="landmark" label="CUIT" value={profile.cuit || "Sin cargar"} />
                 ) : null}
                 {rol === "fletero" ? (
