@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { createClient } from "@supabase/supabase-js";
 
 // Sólo se exponen al bundle del cliente las variables EXPO_PUBLIC_* (ver
@@ -26,7 +27,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: false,
+    detectSessionInUrl: Platform.OS === "web",
   },
 });
 

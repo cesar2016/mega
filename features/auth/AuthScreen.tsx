@@ -31,6 +31,30 @@ const BENEFICIOS = [
   { icon: "truck" as const, title: "Flete coordinado", text: "Conectá con transportistas disponibles en tu radio." },
 ];
 
+function getEmailRedirectUrl(): string {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    return `${window.location.origin}/onboarding`;
+  }
+  return "mercado-ganadero://onboarding";
+}
+
+function traducirErrorAuth(raw?: string): string {
+  const msg = (raw ?? "").toLowerCase();
+  if (msg.includes("email not confirmed")) {
+    return "Todavía no confirmaste tu correo electrónico. Revisá tu bandeja de entrada (o spam) y abrí el enlace de validación.";
+  }
+  if (msg.includes("invalid login credentials")) {
+    return "Correo o contraseña incorrectos.";
+  }
+  if (msg.includes("user already registered")) {
+    return "Ya existe una cuenta registrada con este correo electrónico.";
+  }
+  if (msg.includes("email rate limit") || msg.includes("for security purposes")) {
+    return "Esperá unos segundos antes de volver a solicitar el correo de confirmación.";
+  }
+  return raw || "No se pudo completar la operación";
+}
+
 export default function AuthScreen() {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
@@ -38,11 +62,18 @@ export default function AuthScreen() {
   const [nombre, setNombre] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [emailPendiente, setEmailPendiente] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [reenviando, setReenviando] = useState(false);
 
   const onSubmit = async () => {
     setError(null);
     setInfo(null);
+
+    if (mode === "registro" && nombre.trim().length < 2) {
+      setError("Ingresá tu nombre y apellido (mínimo 2 caracteres)");
+      return;
+    }
 
     const parsed = AuthSchema.safeParse({
       email: email.trim(),
@@ -63,32 +94,76 @@ export default function AuthScreen() {
           password: parsed.data.password,
         });
 
-        if (authError) throw authError;
+        if (authError) {
+          if ((authError.message ?? "").toLowerCase().includes("email not confirmed")) {
+            setEmailPendiente(parsed.data.email);
+          }
+          throw authError;
+        }
+        setEmailPendiente(null);
         showToast("Sesión iniciada", "success");
       } else {
         const { data, error: signUpError } = await supabase.auth.signUp({
           email: parsed.data.email,
           password: parsed.data.password,
           // El trigger handle_new_user crea el profile con este nombre.
-          options: { data: { nombre: parsed.data.nombre } },
+          options: {
+            data: { nombre: parsed.data.nombre },
+            emailRedirectTo: getEmailRedirectUrl(),
+          },
         });
 
         if (signUpError) throw signUpError;
 
+        // Cuando mailer_autoconfirm=false y el correo ya existe, Supabase devuelve identities vacío.
+        if (
+          data.user &&
+          Array.isArray(data.user.identities) &&
+          data.user.identities.length === 0
+        ) {
+          setError("Ya existe una cuenta con este correo electrónico. Iniciá sesión.");
+          setMode("login");
+          return;
+        }
+
         if (data.session) {
           showToast("¡Cuenta creada!", "success");
         } else {
+          setEmailPendiente(parsed.data.email);
           setInfo(
-            "Cuenta creada. Revisá tu email para confirmar la cuenta y después iniciá sesión."
+            `Te enviamos un correo de validación a ${parsed.data.email}. Abrí el enlace del email para activar tu cuenta y continuar.`
           );
           setMode("login");
         }
       }
     } catch (err: any) {
-      const message = err?.message ?? "No se pudo completar la operación";
-      setError(message);
+      setError(traducirErrorAuth(err?.message));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const onReenviarConfirmacion = async () => {
+    const destino = emailPendiente || email.trim();
+    if (!destino) return;
+
+    setReenviando(true);
+    setError(null);
+    try {
+      const { error: resendError } = await supabase.auth.resend({
+        type: "signup",
+        email: destino,
+        options: {
+          emailRedirectTo: getEmailRedirectUrl(),
+        },
+      });
+      if (resendError) throw resendError;
+      setInfo(`Reenviamos el correo de confirmación a ${destino}. Revisá tu bandeja de entrada.`);
+      showToast("Correo de confirmación reenviado", "success");
+    } catch (err: any) {
+      setError(traducirErrorAuth(err?.message));
+    } finally {
+      setReenviando(false);
     }
   };
 
@@ -254,6 +329,19 @@ export default function AuthScreen() {
                     <Icon name="info" size={16} className="mt-0.5 text-sage-600" />
                     <Text className="flex-1 text-sm font-medium text-sage-700">{info}</Text>
                   </View>
+                ) : null}
+
+                {emailPendiente ? (
+                  <Button
+                    label="Reenviar correo de confirmación"
+                    variant="soft"
+                    size="sm"
+                    icon="mail"
+                    loading={reenviando}
+                    disabled={loading || reenviando}
+                    onPress={onReenviarConfirmacion}
+                    fullWidth
+                  />
                 ) : null}
 
                 <Button

@@ -9,7 +9,7 @@ const RoleSchema = z.enum(["productor", "comprador", "fletero"]);
 // Esquema de onboarding: nombre, teléfono, rol
 const OnboardingSchema = z.object({
   nombre: z.string().min(2, "Nombre muy corto").max(50),
-  telefono: z.string().regex(/^[\d+\-]+$/, "Teléfono inválido").optional(),
+  telefono: z.string().regex(/^[\d+\-\s()]*$/, "Teléfono inválido").optional(),
   rol: RoleSchema,
 });
 
@@ -17,17 +17,25 @@ export type OnboardingFormValues = z.infer<typeof OnboardingSchema>;
 
 export function useOnboarding() {
   const [step, setStep] = useState(1); // 1=rol, 2=datos, 3=completo
+  const user = useAuthStore((state) => state.user);
+  const profile = useAuthStore((state) => state.profile);
+  const fetchProfile = useAuthStore((state) => state.fetchProfile);
+  const router = useRouter();
+
   const [formState, setFormState] = useState<OnboardingFormValues>({
-    nombre: "",
-    telefono: "",
+    nombre: profile?.nombre || (user as any)?.user_metadata?.nombre || "",
+    telefono: profile?.telefono || "",
     rol: "comprador",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const user = useAuthStore((state) => state.user);
-  const fetchProfile = useAuthStore((state) => state.fetchProfile);
-  const router = useRouter();
+  useEffect(() => {
+    const nombreInicial = profile?.nombre || (user as any)?.user_metadata?.nombre;
+    if (nombreInicial) {
+      setFormState((prev) => (prev.nombre ? prev : { ...prev, nombre: nombreInicial }));
+    }
+  }, [profile?.nombre, user]);
 
   // Si ya tiene perfil completo, redirigir
   useEffect(() => {
@@ -42,11 +50,15 @@ export function useOnboarding() {
     try {
       const { data, error: queryError } = await supabase
         .from("profiles")
-        .select("onboarding_completado, rol, email_confirmed_at")
+        .select("onboarding_completado, rol, email_confirmed_at, nombre")
         .eq("id", user.id)
         .single();
 
       if (queryError) throw queryError;
+
+      if (data?.nombre) {
+        setFormState((prev) => (prev.nombre ? prev : { ...prev, nombre: data.nombre }));
+      }
 
       if (data?.onboarding_completado && data?.email_confirmed_at) {
         router.replace("/(main)/tabs/feed");
