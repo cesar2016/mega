@@ -231,6 +231,16 @@ export function MatchCard({
               loading={busy}
               disabled={busy}
             />
+            {onContactar ? (
+              <Button
+                label="Consultar"
+                icon="message"
+                variant="soft"
+                size="sm"
+                onPress={onContactar}
+                disabled={busy}
+              />
+            ) : null}
             <Button
               label="Descartar"
               icon="x"
@@ -241,7 +251,15 @@ export function MatchCard({
             />
           </>
         ) : (
-          <Button label="Contactar" icon="message" variant="soft" size="sm" onPress={onContactar} />
+          <Button
+            label="Consultar por chat"
+            icon="message"
+            variant="soft"
+            size="sm"
+            onPress={onContactar}
+            loading={busy}
+            disabled={busy}
+          />
         )}
       </View>
     </Card>

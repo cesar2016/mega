@@ -21,6 +21,7 @@ import {
   useOfertaById,
 } from "lib/hooks/useOfferDB";
 import { showToast } from "lib/utils";
+import { detectarDatosContacto } from "lib/contactFilter";
 import { extensionForMime, toUploadBody } from "lib/upload";
 import { useAuthStore } from "store/authStore";
 import { Icon } from "components/ui/Icon";
@@ -185,6 +186,15 @@ export default function OfferCreateScreen() {
         descripcion: rawValues.descripcion || undefined,
         localidad: rawValues.localidad || undefined,
       });
+
+      if (validated.descripcion) {
+        const bloqueoContacto = detectarDatosContacto(validated.descripcion);
+        if (bloqueoContacto.bloqueado) {
+          throw new Error(
+            bloqueoContacto.motivo ?? "No se permiten datos de contacto en la descripción."
+          );
+        }
+      }
 
       // 1. Subir medios nuevos a Supabase Storage (los que ya tienen `url` se conservan)
       const urlPorId: Record<string, string> = {};
@@ -733,7 +743,13 @@ export default function OfferCreateScreen() {
                   label="Descripción"
                   value={values.descripcion ?? ""}
                   onChangeText={(text) => form.setValue("descripcion", text)}
-                  placeholder="Detalles adicionales sobre el lote..."
+                  placeholder="Detalles adicionales sobre el lote (sanidad, alimentación, estado corporal)..."
+                  hint="Por seguridad, no incluyas teléfonos, correos ni redes sociales en la descripción."
+                  error={
+                    values.descripcion
+                      ? detectarDatosContacto(String(values.descripcion)).motivo
+                      : undefined
+                  }
                   multiline
                   numberOfLines={4}
                   icon="clipboard"

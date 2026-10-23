@@ -4,6 +4,8 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { deleteOferta, useOfertaById } from "lib/hooks/useOfferDB";
+import { iniciarOAbrirConversacion } from "lib/hooks/useChat";
+import { isSupabaseConfigured } from "lib/supabase";
 import { maskNombreUsuario, showToast } from "lib/utils";
 import { useAuthStore } from "store/authStore";
 import { Icon } from "components/ui/Icon";
@@ -158,6 +160,7 @@ export default function OfferDetailScreen() {
   const [activoId, setActivoId] = useState<string | null>(null);
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
   const [eliminando, setEliminando] = useState(false);
+  const [abriendoChat, setAbriendoChat] = useState(false);
 
   const { data, isLoading, error } = useOfertaById(String(id ?? ""));
 
@@ -194,7 +197,32 @@ export default function OfferDetailScreen() {
   const portada = portadaDe(oferta.oferta_media);
   const activo = todos.find((item) => item.id === activoId) ?? portada ?? todos[0] ?? null;
 
-  const irAlChat = () => showToast("La mensajería entre partes llega en la próxima versión", "info");
+  const irAlChat = async () => {
+    if (esPropia || !isSupabaseConfigured) {
+      router.push("/(main)/tabs/chat");
+      return;
+    }
+
+    const contraparteId = oferta.productor_id ?? oferta.profiles?.id;
+    if (!contraparteId) {
+      showToast("No se pudo identificar al vendedor del lote", "error");
+      return;
+    }
+
+    try {
+      setAbriendoChat(true);
+      const convId = await iniciarOAbrirConversacion({
+        contraparteId,
+        ofertaId: oferta.id,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["conversaciones"] });
+      router.push({ pathname: "/(main)/tabs/chat", params: { id: convId } });
+    } catch (err: any) {
+      showToast(err?.message || "No se pudo abrir la consulta", "error");
+    } finally {
+      setAbriendoChat(false);
+    }
+  };
   const irAEditar = () =>
     router.push({ pathname: "/(main)/oferta-nueva", params: { id: oferta.id } });
 
@@ -489,10 +517,19 @@ export default function OfferDetailScreen() {
                 <Icon name="badgeCheck" size={18} className="text-sage-500" />
               </View>
 
+              <View className="flex-row items-center gap-2 rounded-2xl bg-sage-50/70 px-3 py-2">
+                <Icon name="lock" size={13} className="text-sage-600" />
+                <Text className="flex-1 text-[11px] leading-4 text-sage-800">
+                  Canal interno protegido: las consultas son anónimas y no está permitido compartir teléfonos, correos ni redes.
+                </Text>
+              </View>
+
               <View className="flex-row gap-2">
                 <Button
-                  label="Contactar"
+                  label={esPropia ? "Ver consultas" : "Consultar por chat"}
                   icon="message"
+                  loading={abriendoChat}
+                  disabled={abriendoChat}
                   onPress={irAlChat}
                   className="flex-1"
                 />

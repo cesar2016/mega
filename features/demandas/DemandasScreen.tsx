@@ -1,5 +1,8 @@
-import React from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import React, { useState } from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { iniciarOAbrirConversacion } from "lib/hooks/useChat";
 import { useDemandasActivas } from "lib/hooks/useDemandaDB";
 import { useResponsive } from "lib/hooks/useResponsive";
 import { isSupabaseConfigured } from "lib/supabase";
@@ -50,13 +53,49 @@ function rangoCantidad(demanda: Demanda) {
  * Demandas de compra (comprador). Muestra las búsquedas activas del mercado.
  */
 export default function DemandasScreen() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const profile = useAuthStore((state) => state.profile);
   const { width } = useResponsive();
   const columns = width >= 1280 ? 3 : width >= 768 ? 2 : 1;
+  const [ocupadoId, setOcupadoId] = useState<string | null>(null);
 
   const { data, isLoading, error, refetch, isRefetching } = useDemandasActivas({
     enabled: !!profile,
   });
+
+  const contactarDemanda = async (item: Demanda) => {
+    const esPropia = Boolean(
+      profile?.id && (item.comprador_id === profile.id || item.profiles?.id === profile.id)
+    );
+    if (esPropia || !isSupabaseConfigured) {
+      router.push("/(main)/tabs/chat");
+      return;
+    }
+
+    const contraparteId = item.comprador_id ?? item.profiles?.id;
+    if (!contraparteId) {
+      showToast("No se pudo identificar al usuario de la demanda", "error");
+      return;
+    }
+
+    try {
+      setOcupadoId(item.id);
+      const convId = await iniciarOAbrirConversacion({
+        contraparteId,
+        demandaId: item.id,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["conversaciones"] });
+      router.push({ pathname: "/(main)/tabs/chat", params: { id: convId } });
+    } catch (e) {
+      showToast(
+        e instanceof Error ? e.message : "No se pudo abrir la consulta",
+        "error"
+      );
+    } finally {
+      setOcupadoId(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -140,78 +179,81 @@ export default function DemandasScreen() {
           />
         ) : (
           <Grid columns={columns}>
-            {lista.map((item) => (
-              <Card className="gap-4">
-                <View className="flex-row items-start justify-between gap-3">
-                  <View className="min-w-0 flex-1 gap-2">
-                    <Badge tone="sky" icon="shoppingCart">
-                      {item.categoria?.toUpperCase() ?? "DEMANDA"}
-                    </Badge>
-                    <Text className="text-base font-bold text-ink" numberOfLines={1}>
-                      {item.raza || `Búsqueda de ${item.categoria}`}
-                    </Text>
-                  </View>
-                  {item.precio_max ? (
-                    <View className="items-end">
-                      <Text className="text-lg font-extrabold text-sky-600">
-                        ${Number(item.precio_max).toLocaleString("es-AR")}
-                      </Text>
-                      <Text className="text-[11px] uppercase tracking-wide text-ink-muted">
-                        precio máximo
+            {lista.map((item) => {
+              const esPropia = Boolean(
+                profile?.id && (item.comprador_id === profile.id || item.profiles?.id === profile.id)
+              );
+
+              return (
+                <Card key={item.id} className="gap-4">
+                  <View className="flex-row items-start justify-between gap-3">
+                    <View className="min-w-0 flex-1 gap-2">
+                      <Badge tone="sky" icon="shoppingCart">
+                        {item.categoria?.toUpperCase() ?? "DEMANDA"}
+                      </Badge>
+                      <Text className="text-base font-bold text-ink" numberOfLines={1}>
+                        {item.raza || `Búsqueda de ${item.categoria}`}
                       </Text>
                     </View>
-                  ) : null}
-                </View>
+                    {item.precio_max ? (
+                      <View className="items-end">
+                        <Text className="text-lg font-extrabold text-sky-600">
+                          ${Number(item.precio_max).toLocaleString("es-AR")}
+                        </Text>
+                        <Text className="text-[11px] uppercase tracking-wide text-ink-muted">
+                          precio máximo
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
 
-                <View className="flex-row flex-wrap gap-2">
-                  <View className="flex-row items-center gap-1.5 rounded-xl bg-surface-soft px-2.5 py-1.5">
-                    <Icon name="boxes" size={14} className="text-ink-muted" />
-                    <Text className="text-xs font-semibold text-ink-soft">{rangoCantidad(item)}</Text>
-                  </View>
-                  <View className="flex-row items-center gap-1.5 rounded-xl bg-surface-soft px-2.5 py-1.5">
-                    <Icon name="scale" size={14} className="text-ink-muted" />
-                    <Text className="text-xs font-semibold text-ink-soft">{rangoPeso(item)}</Text>
-                  </View>
-                  {item.radio_km ? (
+                  <View className="flex-row flex-wrap gap-2">
                     <View className="flex-row items-center gap-1.5 rounded-xl bg-surface-soft px-2.5 py-1.5">
-                      <Icon name="signal" size={14} className="text-ink-muted" />
-                      <Text className="text-xs font-semibold text-ink-soft">
-                        {item.radio_km} km
-                      </Text>
+                      <Icon name="boxes" size={14} className="text-ink-muted" />
+                      <Text className="text-xs font-semibold text-ink-soft">{rangoCantidad(item)}</Text>
                     </View>
-                  ) : null}
-                </View>
-
-                <View className="flex-row items-center gap-2 border-t border-line-soft pt-3">
-                  <Avatar
-                    uri={null}
-                    nombre={maskNombreUsuario(
-                      item.profiles?.nombre,
-                      "Usu****",
-                      Boolean(
-                        profile?.id &&
-                          (item.comprador_id === profile.id || item.profiles?.id === profile.id)
-                      )
-                    )}
-                    size={30}
-                  />
-                  <Text className="flex-1 text-xs font-medium text-ink-soft" numberOfLines={1}>
-                    {maskNombreUsuario(
-                      item.profiles?.nombre,
-                      "Usu****",
-                      Boolean(
-                        profile?.id &&
-                          (item.comprador_id === profile.id || item.profiles?.id === profile.id)
-                      )
-                    )}
-                  </Text>
-                  <View className="flex-row items-center gap-1 text-sky-600">
-                    <Text className="text-xs font-bold">Ver demanda</Text>
-                    <Icon name="chevronRight" size={14} className="text-sky-600" />
+                    <View className="flex-row items-center gap-1.5 rounded-xl bg-surface-soft px-2.5 py-1.5">
+                      <Icon name="scale" size={14} className="text-ink-muted" />
+                      <Text className="text-xs font-semibold text-ink-soft">{rangoPeso(item)}</Text>
+                    </View>
+                    {item.radio_km ? (
+                      <View className="flex-row items-center gap-1.5 rounded-xl bg-surface-soft px-2.5 py-1.5">
+                        <Icon name="signal" size={14} className="text-ink-muted" />
+                        <Text className="text-xs font-semibold text-ink-soft">
+                          {item.radio_km} km
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
-                </View>
-              </Card>
-            ))}
+
+                  <View className="flex-row items-center gap-2 border-t border-line-soft pt-3">
+                    <Avatar
+                      uri={null}
+                      nombre={maskNombreUsuario(item.profiles?.nombre, "Usu****", esPropia)}
+                      size={30}
+                    />
+                    <Text className="flex-1 text-xs font-medium text-ink-soft" numberOfLines={1}>
+                      {maskNombreUsuario(item.profiles?.nombre, "Usu****", esPropia)}
+                    </Text>
+                    <Pressable
+                      onPress={() => contactarDemanda(item)}
+                      disabled={ocupadoId === item.id}
+                      accessibilityRole="button"
+                      className="flex-row items-center gap-1.5 rounded-xl bg-sky-50 px-3 py-1.5 active:bg-sky-100"
+                    >
+                      <Icon name="message" size={13} className="text-sky-600" />
+                      <Text className="text-xs font-bold text-sky-700">
+                        {ocupadoId === item.id
+                          ? "Abriendo..."
+                          : esPropia
+                            ? "Ver consultas"
+                            : "Consultar por chat"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </Card>
+              );
+            })}
           </Grid>
         )}
       </Screen>

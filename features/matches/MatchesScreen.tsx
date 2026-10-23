@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { iniciarOAbrirConversacion } from "lib/hooks/useChat";
 import { actualizarEstadoMatch, useMatches } from "lib/hooks/useMatches";
 import type { EstadoMatch, MatchRow } from "lib/hooks/useMatches";
 import { useResponsive } from "lib/hooks/useResponsive";
@@ -107,6 +108,42 @@ export default function MatchesScreen() {
 
   const contraparteDe = (match: MatchRow): "oferta" | "demanda" =>
     match.ofertas?.productor_id === profile?.id ? "demanda" : "oferta";
+
+  const contactarMatch = async (match: MatchRow) => {
+    if (!isSupabaseConfigured) {
+      router.push("/(main)/tabs/chat");
+      return;
+    }
+
+    const tipoContraparte = contraparteDe(match);
+    const contraparteId =
+      tipoContraparte === "demanda"
+        ? (match.demandas?.comprador_id ?? match.demandas?.profiles?.id)
+        : (match.ofertas?.productor_id ?? match.ofertas?.profiles?.id);
+
+    if (!contraparteId) {
+      showToast("No se pudo identificar a la contraparte", "error");
+      return;
+    }
+
+    setOcupado(match.id);
+    try {
+      const convId = await iniciarOAbrirConversacion({
+        contraparteId,
+        ofertaId: match.oferta_id,
+        demandaId: match.demanda_id,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["conversaciones"] });
+      router.push({ pathname: "/(main)/tabs/chat", params: { id: convId } });
+    } catch (e) {
+      showToast(
+        e instanceof Error ? e.message : "No se pudo abrir el chat",
+        "error",
+      );
+    } finally {
+      setOcupado(null);
+    }
+  };
 
   if (!profile) {
     return (
@@ -223,9 +260,7 @@ export default function MatchesScreen() {
                   onAceptar={() => cambiarEstado(match.id, "aceptado")}
                   onRechazar={() => cambiarEstado(match.id, "rechazado")}
                   onVerOferta={() => router.push(`/(main)/oferta/${match.oferta_id}`)}
-                  onContactar={() =>
-                    showToast("La mensajería entre partes llega en la próxima versión", "info")
-                  }
+                  onContactar={() => contactarMatch(match)}
                 />
               );
             })}

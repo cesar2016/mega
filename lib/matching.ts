@@ -30,7 +30,7 @@ export type OfertaMatch = {
   provincia?: string | null;
   localidad?: string | null;
   estado?: string | null;
-  profiles?: { nombre?: string | null; avatar_url?: string | null } | null;
+  profiles?: { id?: string | null; nombre?: string | null; avatar_url?: string | null } | null;
   oferta_media?: OfertaMediaRow[] | null;
 };
 
@@ -50,7 +50,7 @@ export type DemandaMatch = {
   localidad?: string | null;
   radio_km?: number | null;
   estado?: string | null;
-  profiles?: { nombre?: string | null; avatar_url?: string | null } | null;
+  profiles?: { id?: string | null; nombre?: string | null; avatar_url?: string | null } | null;
 };
 
 /**
