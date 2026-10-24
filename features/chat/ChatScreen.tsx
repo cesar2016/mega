@@ -11,10 +11,12 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   enviarMensaje,
+  iniciarOAbrirConversacion,
+  useBorradorConsulta,
   useConversaciones,
   useMensajes,
 } from "lib/hooks/useChat";
-import type { ConversacionResumen } from "lib/hooks/useChat";
+import type { BorradorConsulta, ConversacionResumen } from "lib/hooks/useChat";
 import { detectarDatosContacto } from "lib/contactFilter";
 import { useResponsive } from "lib/hooks/useResponsive";
 import { isSupabaseConfigured } from "lib/supabase";
@@ -47,7 +49,9 @@ function formatearHora(iso?: string | null): string {
   }
 }
 
-function resumenContexto(conv: ConversacionResumen): string {
+function resumenContexto(
+  conv: Pick<BorradorConsulta, "ofertas" | "demandas">
+): string {
   if (conv.ofertas) {
     const o = conv.ofertas;
     return [
@@ -72,7 +76,15 @@ function resumenContexto(conv: ConversacionResumen): string {
 }
 
 export default function ChatScreen() {
-  const { id: paramConvId } = useLocalSearchParams<{ id?: string }>();
+  const {
+    id: paramConvId,
+    ofertaId: paramOfertaId,
+    demandaId: paramDemandaId,
+  } = useLocalSearchParams<{
+    id?: string;
+    ofertaId?: string;
+    demandaId?: string;
+  }>();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isWide } = useResponsive();
@@ -80,6 +92,9 @@ export default function ChatScreen() {
 
   const [seleccionadaId, setSeleccionadaId] = useState<string | null>(
     paramConvId ? String(paramConvId) : null
+  );
+  const [viendoBorrador, setViendoBorrador] = useState<boolean>(
+    Boolean(paramOfertaId || paramDemandaId)
   );
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -96,24 +111,90 @@ export default function ChatScreen() {
     [conversacionesData]
   );
 
-  useEffect(() => {
+  const convExistenteDelParam = useMemo(() => {
     if (paramConvId) {
-      setSeleccionadaId(String(paramConvId));
-    } else if (isWide && !seleccionadaId && conversaciones.length > 0) {
-      setSeleccionadaId(conversaciones[0].id);
+      return conversaciones.find((c) => c.id === String(paramConvId)) ?? null;
     }
-  }, [paramConvId, isWide, seleccionadaId, conversaciones]);
+    if (paramOfertaId) {
+      return (
+        conversaciones.find((c) => c.oferta_id === String(paramOfertaId)) ??
+        null
+      );
+    }
+    if (paramDemandaId) {
+      return (
+        conversaciones.find((c) => c.demanda_id === String(paramDemandaId)) ??
+        null
+      );
+    }
+    return null;
+  }, [conversaciones, paramConvId, paramOfertaId, paramDemandaId]);
+
+  const { data: borradorData, isLoading: cargandoBorrador } =
+    useBorradorConsulta({
+      conversacionId: paramConvId ? String(paramConvId) : null,
+      ofertaId: paramOfertaId ? String(paramOfertaId) : null,
+      demandaId: paramDemandaId ? String(paramDemandaId) : null,
+      enabled: Boolean(
+        user?.id &&
+          (paramConvId || paramOfertaId || paramDemandaId) &&
+          !convExistenteDelParam
+      ),
+    });
+
+  useEffect(() => {
+    if (paramConvId || paramOfertaId || paramDemandaId) {
+      if (convExistenteDelParam) {
+        setViendoBorrador(false);
+        setSeleccionadaId(convExistenteDelParam.id);
+      } else {
+        setViendoBorrador(true);
+        setSeleccionadaId(null);
+      }
+      return;
+    }
+
+    setViendoBorrador(false);
+
+    if (isWide && conversaciones.length > 0) {
+      setSeleccionadaId((prev) =>
+        conversaciones.some((c) => c.id === prev) ? prev : conversaciones[0].id
+      );
+    }
+  }, [
+    paramConvId,
+    paramOfertaId,
+    paramDemandaId,
+    convExistenteDelParam,
+    isWide,
+    conversaciones,
+  ]);
 
   const conversacionActiva = useMemo(
-    () => conversaciones.find((c) => c.id === seleccionadaId) ?? null,
-    [conversaciones, seleccionadaId]
+    () =>
+      !viendoBorrador
+        ? (conversaciones.find((c) => c.id === seleccionadaId) ?? null)
+        : null,
+    [conversaciones, seleccionadaId, viendoBorrador]
   );
+
+  const borradorActivo = useMemo(
+    () =>
+      viendoBorrador && !convExistenteDelParam ? (borradorData ?? null) : null,
+    [viendoBorrador, convExistenteDelParam, borradorData]
+  );
+
+  const contextoActivo: (ConversacionResumen | BorradorConsulta) | null =
+    conversacionActiva ?? borradorActivo;
 
   const { data: mensajesData, isLoading: cargandoMensajes } = useMensajes(
-    conversacionActiva?.id ?? seleccionadaId
+    conversacionActiva?.id ?? null
   );
 
-  const mensajes = useMemo(() => mensajesData ?? [], [mensajesData]);
+  const mensajes = useMemo(
+    () => (conversacionActiva ? (mensajesData ?? []) : []),
+    [conversacionActiva, mensajesData]
+  );
 
   useEffect(() => {
     if (mensajes.length > 0) {
@@ -131,8 +212,7 @@ export default function ChatScreen() {
 
   const handleEnviar = async (mensajeExplicito?: string) => {
     const cuerpo = (mensajeExplicito ?? texto).trim();
-    const convId = conversacionActiva?.id ?? seleccionadaId;
-    if (!cuerpo || !convId || !user?.id) return;
+    if (!cuerpo || !user?.id || !contextoActivo) return;
 
     const control = detectarDatosContacto(cuerpo);
     if (control.bloqueado) {
@@ -145,6 +225,16 @@ export default function ChatScreen() {
 
     try {
       setEnviando(true);
+      let convId = conversacionActiva?.id ?? null;
+      if (!convId && borradorActivo) {
+        convId = await iniciarOAbrirConversacion({
+          contraparteId: borradorActivo.contraparte_id,
+          ofertaId: borradorActivo.oferta_id,
+          demandaId: borradorActivo.demanda_id,
+        });
+      }
+      if (!convId) return;
+
       await enviarMensaje({
         conversacionId: convId,
         remitenteId: user.id,
@@ -153,6 +243,8 @@ export default function ChatScreen() {
       if (!mensajeExplicito) {
         setTexto("");
       }
+      setViendoBorrador(false);
+      setSeleccionadaId(convId);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["mensajes", convId] }),
         queryClient.invalidateQueries({ queryKey: ["conversaciones"] }),
@@ -186,7 +278,7 @@ export default function ChatScreen() {
     );
   }
 
-  if (cargandoConvs) {
+  if (cargandoConvs || (viendoBorrador && cargandoBorrador)) {
     return (
       <View className="flex-1 items-center justify-center gap-3 bg-canvas">
         <ActivityIndicator size="large" className="text-sage-500" />
@@ -195,18 +287,33 @@ export default function ChatScreen() {
     );
   }
 
-  const mostrarLista = isWide || !seleccionadaId;
-  const mostrarHilo = isWide || Boolean(seleccionadaId);
+  const tieneConversaciones = conversaciones.length > 0;
+  const mostrarLista = tieneConversaciones && (isWide || !contextoActivo);
+  const mostrarHilo =
+    Boolean(contextoActivo) || (isWide && tieneConversaciones);
 
   return (
     <View className="flex-1 bg-canvas">
       <MobileTopBar
         title={
-          !isWide && conversacionActiva
-            ? `Chat con ${conversacionActiva.contraparte_alias}`
+          !isWide && contextoActivo
+            ? `Chat con ${contextoActivo.contraparte_alias}`
             : "Chat interno"
         }
-        onBack={!isWide && seleccionadaId ? () => setSeleccionadaId(null) : undefined}
+        onBack={
+          !isWide && contextoActivo
+            ? () => {
+                if (viendoBorrador) {
+                  setViendoBorrador(false);
+                  if (!tieneConversaciones) {
+                    router.back();
+                  }
+                } else {
+                  setSeleccionadaId(null);
+                }
+              }
+            : undefined
+        }
       />
 
       <Screen
@@ -236,7 +343,7 @@ export default function ChatScreen() {
           </View>
         </Gradient>
 
-        {conversaciones.length === 0 && !seleccionadaId ? (
+        {!tieneConversaciones && !contextoActivo ? (
           <EmptyState
             icon="message"
             title="Todavía no tenés conversaciones activas"
@@ -251,7 +358,7 @@ export default function ChatScreen() {
           />
         ) : (
           <View className="flex-col gap-4 lg:flex-row lg:items-start">
-            {/* Columna izquierda: listado de conversaciones */}
+            {/* Columna izquierda: listado de conversaciones activas (solo si ya inició alguna charla) */}
             {mostrarLista ? (
               <Card
                 padded={false}
@@ -265,11 +372,15 @@ export default function ChatScreen() {
 
                 <View className="divide-y divide-line-soft">
                   {conversaciones.map((conv) => {
-                    const activa = conv.id === seleccionadaId;
+                    const activa =
+                      !viendoBorrador && conv.id === seleccionadaId;
                     return (
                       <Pressable
                         key={conv.id}
-                        onPress={() => setSeleccionadaId(conv.id)}
+                        onPress={() => {
+                          setViendoBorrador(false);
+                          setSeleccionadaId(conv.id);
+                        }}
                         className={[
                           "flex-row items-center gap-3 px-4 py-3.5",
                           activa ? "bg-sage-50" : "active:bg-surface-sunk",
@@ -304,8 +415,7 @@ export default function ChatScreen() {
                             className="text-xs text-ink-muted"
                             numberOfLines={1}
                           >
-                            {conv.ultimo_mensaje?.cuerpo ??
-                              "Sin mensajes todavía — enviá tu consulta"}
+                            {conv.ultimo_mensaje?.cuerpo ?? ""}
                           </Text>
                         </View>
                       </Pressable>
@@ -321,14 +431,17 @@ export default function ChatScreen() {
                 padded={false}
                 className="w-full flex-1 overflow-hidden"
               >
-                {conversacionActiva || seleccionadaId ? (
+                {contextoActivo ? (
                   <View className="flex-col">
                     {/* Cabecera de la conversación */}
                     <View className="flex-row flex-wrap items-center justify-between gap-3 border-b border-line-soft bg-surface-soft/50 px-5 py-3.5">
                       <View className="flex-row items-center gap-3">
-                        {!isWide ? (
+                        {!isWide && tieneConversaciones ? (
                           <Pressable
-                            onPress={() => setSeleccionadaId(null)}
+                            onPress={() => {
+                              setViendoBorrador(false);
+                              setSeleccionadaId(null);
+                            }}
                             className="h-8 w-8 items-center justify-center rounded-xl border border-line bg-surface"
                           >
                             <Icon
@@ -340,30 +453,25 @@ export default function ChatScreen() {
                         ) : null}
                         <Avatar
                           uri={null}
-                          nombre={
-                            conversacionActiva?.contraparte_alias ?? "Usu****"
-                          }
+                          nombre={contextoActivo.contraparte_alias}
                           size={38}
                         />
                         <View className="gap-0.5">
                           <View className="flex-row items-center gap-2">
                             <Text className="text-sm font-bold text-ink">
-                              {conversacionActiva?.contraparte_alias ??
-                                "Usu****"}
+                              {contextoActivo.contraparte_alias}
                             </Text>
                             <Badge tone="sage" icon="lock">
                               Anonimizado
                             </Badge>
                           </View>
                           <Text className="text-xs text-ink-muted">
-                            {conversacionActiva
-                              ? resumenContexto(conversacionActiva)
-                              : "Conversación protegida"}
+                            {resumenContexto(contextoActivo)}
                           </Text>
                         </View>
                       </View>
 
-                      {conversacionActiva?.oferta_id ? (
+                      {contextoActivo.oferta_id ? (
                         <Button
                           label="Ver publicación"
                           icon="eye"
@@ -371,7 +479,7 @@ export default function ChatScreen() {
                           size="sm"
                           onPress={() =>
                             router.push(
-                              `/(main)/oferta/${conversacionActiva.oferta_id}`
+                              `/(main)/oferta/${contextoActivo.oferta_id}`
                             )
                           }
                         />
@@ -405,8 +513,7 @@ export default function ChatScreen() {
                           </View>
                           <Text className="text-center text-sm font-bold text-ink">
                             Iniciá la consulta con{" "}
-                            {conversacionActiva?.contraparte_alias ??
-                              "la contraparte"}
+                            {contextoActivo.contraparte_alias}
                           </Text>
                           <Text className="max-w-md text-center text-xs leading-5 text-ink-muted">
                             Hacé todas las preguntas que necesites sobre la
@@ -429,8 +536,7 @@ export default function ChatScreen() {
                             >
                               {!esMio ? (
                                 <Text className="mb-0.5 text-[10px] font-bold text-sage-700">
-                                  {conversacionActiva?.contraparte_alias ??
-                                    "Usu****"}
+                                  {contextoActivo.contraparte_alias}
                                 </Text>
                               ) : null}
                               <Text

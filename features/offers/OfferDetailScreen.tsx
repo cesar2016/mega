@@ -4,7 +4,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { deleteOferta, useOfertaById } from "lib/hooks/useOfferDB";
-import { iniciarOAbrirConversacion } from "lib/hooks/useChat";
 import { isSupabaseConfigured } from "lib/supabase";
 import { maskNombreUsuario, showToast } from "lib/utils";
 import { useAuthStore } from "store/authStore";
@@ -160,7 +159,6 @@ export default function OfferDetailScreen() {
   const [activoId, setActivoId] = useState<string | null>(null);
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
   const [eliminando, setEliminando] = useState(false);
-  const [abriendoChat, setAbriendoChat] = useState(false);
 
   const { data, isLoading, error } = useOfertaById(String(id ?? ""));
 
@@ -197,7 +195,7 @@ export default function OfferDetailScreen() {
   const portada = portadaDe(oferta.oferta_media);
   const activo = todos.find((item) => item.id === activoId) ?? portada ?? todos[0] ?? null;
 
-  const irAlChat = async () => {
+  const irAlChat = () => {
     if (esPropia || !isSupabaseConfigured) {
       router.push("/(main)/tabs/chat");
       return;
@@ -209,19 +207,10 @@ export default function OfferDetailScreen() {
       return;
     }
 
-    try {
-      setAbriendoChat(true);
-      const convId = await iniciarOAbrirConversacion({
-        contraparteId,
-        ofertaId: oferta.id,
-      });
-      await queryClient.invalidateQueries({ queryKey: ["conversaciones"] });
-      router.push({ pathname: "/(main)/tabs/chat", params: { id: convId } });
-    } catch (err: any) {
-      showToast(err?.message || "No se pudo abrir la consulta", "error");
-    } finally {
-      setAbriendoChat(false);
-    }
+    router.push({
+      pathname: "/(main)/tabs/chat",
+      params: { ofertaId: oferta.id },
+    });
   };
   const irAEditar = () =>
     router.push({ pathname: "/(main)/oferta-nueva", params: { id: oferta.id } });
@@ -528,8 +517,6 @@ export default function OfferDetailScreen() {
                 <Button
                   label={esPropia ? "Ver consultas" : "Consultar por chat"}
                   icon="message"
-                  loading={abriendoChat}
-                  disabled={abriendoChat}
                   onPress={irAlChat}
                   className="flex-1"
                 />

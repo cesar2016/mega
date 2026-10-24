@@ -38,7 +38,12 @@ export function MobileTabBar({ state, descriptors, navigation }: BottomTabBarPro
                 canPreventDefault: true,
               });
               if (!focused && !event.defaultPrevented) {
-                navigation.navigate(route.name);
+                navigation.navigate(
+                  route.name,
+                  route.name === "chat"
+                    ? { id: undefined, ofertaId: undefined, demandaId: undefined }
+                    : undefined
+                );
               }
             }}
             className="flex-1 items-center gap-1 rounded-2xl py-1.5"

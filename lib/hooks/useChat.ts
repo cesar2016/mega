@@ -49,9 +49,19 @@ export type ConversacionResumen = {
   } | null;
 };
 
+export type BorradorConsulta = {
+  oferta_id: string | null;
+  demanda_id: string | null;
+  contraparte_id: string;
+  contraparte_alias: string;
+  ofertas?: ConversacionResumen["ofertas"];
+  demandas?: ConversacionResumen["demandas"];
+};
+
 /**
- * Lista las conversaciones del usuario actual con el alias semi-encriptado
- * de la contraparte (ej. `Ces****`) y el contexto del lote o demanda.
+ * Lista las conversaciones activas del usuario actual (solo aquellas donde ya
+ * se envió al menos un mensaje) con el alias semi-encriptado de la contraparte
+ * (ej. `Ces****`) y el contexto del lote o demanda.
  */
 export function useConversaciones(options?: { enabled?: boolean }) {
   const queryClient = useQueryClient();
@@ -125,29 +135,13 @@ export function useConversaciones(options?: { enabled?: boolean }) {
       const filas = (convs ?? []) as any[];
       if (filas.length === 0) return [];
 
-      const contraparteIds = Array.from(
-        new Set(
-          filas.map((c) =>
-            c.participante_1 === userId ? c.participante_2 : c.participante_1
-          )
-        )
-      );
-
       const convIds = filas.map((c) => c.id);
 
-      const [{ data: perfilesData }, { data: ultimosData }] = await Promise.all([
-        supabase.from("profiles").select("id, nombre").in("id", contraparteIds),
-        supabase
-          .from("mensajes")
-          .select("conversacion_id, cuerpo, creado_en, remitente_id")
-          .in("conversacion_id", convIds)
-          .order("creado_en", { ascending: false }),
-      ]);
-
-      const aliasPorId = new Map<string, string>();
-      for (const p of (perfilesData ?? []) as { id: string; nombre?: string | null }[]) {
-        aliasPorId.set(p.id, maskNombreUsuario(p.nombre));
-      }
+      const { data: ultimosData } = await supabase
+        .from("mensajes")
+        .select("conversacion_id, cuerpo, creado_en, remitente_id")
+        .in("conversacion_id", convIds)
+        .order("creado_en", { ascending: false });
 
       const ultimoPorConv = new Map<
         string,
@@ -168,7 +162,29 @@ export function useConversaciones(options?: { enabled?: boolean }) {
         }
       }
 
-      return filas.map((c) => {
+      // Solo considerar conversaciones donde efectivamente se haya iniciado la charla
+      const filasConMensajes = filas.filter((c) => ultimoPorConv.has(c.id));
+      if (filasConMensajes.length === 0) return [];
+
+      const contraparteIds = Array.from(
+        new Set(
+          filasConMensajes.map((c) =>
+            c.participante_1 === userId ? c.participante_2 : c.participante_1
+          )
+        )
+      );
+
+      const { data: perfilesData } = await supabase
+        .from("profiles")
+        .select("id, nombre")
+        .in("id", contraparteIds);
+
+      const aliasPorId = new Map<string, string>();
+      for (const p of (perfilesData ?? []) as { id: string; nombre?: string | null }[]) {
+        aliasPorId.set(p.id, maskNombreUsuario(p.nombre));
+      }
+
+      return filasConMensajes.map((c) => {
         const contraparteId =
           c.participante_1 === userId ? c.participante_2 : c.participante_1;
         return {
@@ -181,6 +197,143 @@ export function useConversaciones(options?: { enabled?: boolean }) {
     },
     enabled: Boolean(userId) && (options?.enabled ?? true) && isSupabaseConfigured,
     refetchInterval: 15000,
+  });
+}
+
+/**
+ * Carga los datos de contexto de una oferta o demanda para mostrar la ventana
+ * de nueva consulta sin crear la conversación en la base hasta enviar el primer mensaje.
+ */
+export function useBorradorConsulta(params: {
+  conversacionId?: string | null;
+  ofertaId?: string | null;
+  demandaId?: string | null;
+  enabled?: boolean;
+}) {
+  const userId = useAuthStore((state) => state.user?.id);
+  const conversacionId = params.conversacionId ? String(params.conversacionId) : null;
+  const ofertaId = params.ofertaId ? String(params.ofertaId) : null;
+  const demandaId = params.demandaId ? String(params.demandaId) : null;
+
+  return useQuery({
+    queryKey: ["borrador_consulta", userId, conversacionId, ofertaId, demandaId],
+    queryFn: async (): Promise<BorradorConsulta | null> => {
+      if (!userId) return null;
+
+      let targetOfertaId = ofertaId;
+      let targetDemandaId = demandaId;
+
+      if (!targetOfertaId && !targetDemandaId && conversacionId) {
+        const { data: conv } = await supabase
+          .from("conversaciones")
+          .select("oferta_id, demanda_id")
+          .eq("id", conversacionId)
+          .maybeSingle();
+        if (conv) {
+          targetOfertaId = (conv as any).oferta_id ?? null;
+          targetDemandaId = (conv as any).demanda_id ?? null;
+        }
+      }
+
+      if (targetOfertaId) {
+        const { data: oferta, error } = await supabase
+          .from("ofertas")
+          .select(`
+            id,
+            productor_id,
+            categoria,
+            raza,
+            cantidad,
+            precio,
+            tipo_precio,
+            provincia,
+            localidad,
+            profiles (
+              id,
+              nombre
+            )
+          `)
+          .eq("id", targetOfertaId)
+          .maybeSingle();
+
+        if (error || !oferta) return null;
+        const perfil = Array.isArray((oferta as any).profiles)
+          ? (oferta as any).profiles[0]
+          : (oferta as any).profiles;
+        const contraparteId = (oferta as any).productor_id ?? perfil?.id;
+        if (!contraparteId || contraparteId === userId) return null;
+
+        return {
+          oferta_id: (oferta as any).id,
+          demanda_id: null,
+          contraparte_id: contraparteId,
+          contraparte_alias: maskNombreUsuario(perfil?.nombre),
+          ofertas: {
+            id: (oferta as any).id,
+            categoria: (oferta as any).categoria,
+            raza: (oferta as any).raza,
+            cantidad: (oferta as any).cantidad,
+            precio: (oferta as any).precio,
+            tipo_precio: (oferta as any).tipo_precio,
+            provincia: (oferta as any).provincia,
+            localidad: (oferta as any).localidad,
+          },
+          demandas: null,
+        };
+      }
+
+      if (targetDemandaId) {
+        const { data: demanda, error } = await supabase
+          .from("demandas")
+          .select(`
+            id,
+            comprador_id,
+            categoria,
+            raza,
+            cantidad_min,
+            cantidad_max,
+            provincia,
+            localidad,
+            profiles (
+              id,
+              nombre
+            )
+          `)
+          .eq("id", targetDemandaId)
+          .maybeSingle();
+
+        if (error || !demanda) return null;
+        const perfil = Array.isArray((demanda as any).profiles)
+          ? (demanda as any).profiles[0]
+          : (demanda as any).profiles;
+        const contraparteId = (demanda as any).comprador_id ?? perfil?.id;
+        if (!contraparteId || contraparteId === userId) return null;
+
+        return {
+          oferta_id: null,
+          demanda_id: (demanda as any).id,
+          contraparte_id: contraparteId,
+          contraparte_alias: maskNombreUsuario(perfil?.nombre),
+          ofertas: null,
+          demandas: {
+            id: (demanda as any).id,
+            categoria: (demanda as any).categoria,
+            raza: (demanda as any).raza,
+            cantidad_min: (demanda as any).cantidad_min,
+            cantidad_max: (demanda as any).cantidad_max,
+            provincia: (demanda as any).provincia,
+            localidad: (demanda as any).localidad,
+          },
+        };
+      }
+
+      return null;
+    },
+    enabled:
+      Boolean(userId) &&
+      Boolean(conversacionId || ofertaId || demandaId) &&
+      (params.enabled ?? true) &&
+      isSupabaseConfigured,
   });
 }
 

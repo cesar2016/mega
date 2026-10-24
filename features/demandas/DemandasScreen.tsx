@@ -1,8 +1,6 @@
-import React, { useState } from "react";
+import React from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { useQueryClient } from "@tanstack/react-query";
-import { iniciarOAbrirConversacion } from "lib/hooks/useChat";
 import { useDemandasActivas } from "lib/hooks/useDemandaDB";
 import { useResponsive } from "lib/hooks/useResponsive";
 import { isSupabaseConfigured } from "lib/supabase";
@@ -54,17 +52,15 @@ function rangoCantidad(demanda: Demanda) {
  */
 export default function DemandasScreen() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const profile = useAuthStore((state) => state.profile);
   const { width } = useResponsive();
   const columns = width >= 1280 ? 3 : width >= 768 ? 2 : 1;
-  const [ocupadoId, setOcupadoId] = useState<string | null>(null);
 
   const { data, isLoading, error, refetch, isRefetching } = useDemandasActivas({
     enabled: !!profile,
   });
 
-  const contactarDemanda = async (item: Demanda) => {
+  const contactarDemanda = (item: Demanda) => {
     const esPropia = Boolean(
       profile?.id && (item.comprador_id === profile.id || item.profiles?.id === profile.id)
     );
@@ -79,22 +75,10 @@ export default function DemandasScreen() {
       return;
     }
 
-    try {
-      setOcupadoId(item.id);
-      const convId = await iniciarOAbrirConversacion({
-        contraparteId,
-        demandaId: item.id,
-      });
-      await queryClient.invalidateQueries({ queryKey: ["conversaciones"] });
-      router.push({ pathname: "/(main)/tabs/chat", params: { id: convId } });
-    } catch (e) {
-      showToast(
-        e instanceof Error ? e.message : "No se pudo abrir la consulta",
-        "error"
-      );
-    } finally {
-      setOcupadoId(null);
-    }
+    router.push({
+      pathname: "/(main)/tabs/chat",
+      params: { demandaId: item.id },
+    });
   };
 
   if (isLoading) {
@@ -237,17 +221,12 @@ export default function DemandasScreen() {
                     </Text>
                     <Pressable
                       onPress={() => contactarDemanda(item)}
-                      disabled={ocupadoId === item.id}
                       accessibilityRole="button"
                       className="flex-row items-center gap-1.5 rounded-xl bg-sky-50 px-3 py-1.5 active:bg-sky-100"
                     >
                       <Icon name="message" size={13} className="text-sky-600" />
                       <Text className="text-xs font-bold text-sky-700">
-                        {ocupadoId === item.id
-                          ? "Abriendo..."
-                          : esPropia
-                            ? "Ver consultas"
-                            : "Consultar por chat"}
+                        {esPropia ? "Ver consultas" : "Consultar por chat"}
                       </Text>
                     </Pressable>
                   </View>
