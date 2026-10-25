@@ -2,6 +2,7 @@ import React from "react";
 import { Tabs } from "expo-router";
 import { useResponsive } from "lib/hooks/useResponsive";
 import { usePendientesMatch } from "lib/hooks/useMatches";
+import { useMensajesSinLeer } from "lib/hooks/useChat";
 import { useAuthStore } from "store/authStore";
 import { MobileTabBar } from "components/layout/MobileTabBar";
 import { Icon } from "components/ui/Icon";
@@ -11,6 +12,7 @@ export default function TabsLayout() {
   const { isWide } = useResponsive();
   const profile = useAuthStore((state) => state.profile);
   const pendientes = usePendientesMatch({ enabled: !!profile });
+  const mensajesSinLeer = useMensajesSinLeer({ enabled: !!profile });
 
   return (
     <Tabs
@@ -29,7 +31,13 @@ export default function TabsLayout() {
           options={{
             title: item.title,
             tabBarBadge:
-              item.name === "matches" && pendientes > 0 ? pendientes : undefined,
+              item.name === "matches" && pendientes > 0
+                ? pendientes
+                : item.name === "chat" && mensajesSinLeer > 0
+                  ? mensajesSinLeer > 99
+                    ? "99+"
+                    : mensajesSinLeer
+                  : undefined,
             tabBarBadgeStyle: {
               backgroundColor: "#C4764F",
               color: "#FFFFFF",

@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase, isSupabaseConfigured } from "lib/supabase";
 import { detectarDatosContacto } from "lib/contactFilter";
-import { maskNombreUsuario } from "lib/utils";
+import { maskNombreUsuario, showToast } from "lib/utils";
 import { useAuthStore } from "store/authStore";
 
 export type MensajeRow = {
@@ -11,6 +11,7 @@ export type MensajeRow = {
   remitente_id: string;
   cuerpo: string;
   creado_en: string;
+  leido_en?: string | null;
 };
 
 export type ConversacionResumen = {
@@ -23,10 +24,12 @@ export type ConversacionResumen = {
   creado_en: string | null;
   contraparte_id: string;
   contraparte_alias: string;
+  no_leidos: number;
   ultimo_mensaje?: {
     cuerpo: string;
     creado_en: string;
     remitente_id: string;
+    leido_en?: string | null;
   } | null;
   ofertas?: {
     id: string;
@@ -58,20 +61,28 @@ export type BorradorConsulta = {
   demandas?: ConversacionResumen["demandas"];
 };
 
+let conversacionEnFocoId: string | null = null;
+const mensajesNotificados = new Set<string>();
+
+export function setConversacionEnFoco(id: string | null) {
+  conversacionEnFocoId = id;
+}
+
 /**
  * Lista las conversaciones activas del usuario actual (solo aquellas donde ya
  * se envió al menos un mensaje) con el alias semi-encriptado de la contraparte
- * (ej. `Ces****`) y el contexto del lote o demanda.
+ * (ej. `Ces****`), el conteo de mensajes sin leer y el contexto del lote o demanda.
  */
 export function useConversaciones(options?: { enabled?: boolean }) {
   const queryClient = useQueryClient();
   const userId = useAuthStore((state) => state.user?.id);
 
   useEffect(() => {
-    if (!isSupabaseConfigured || !userId) return;
+    if (!isSupabaseConfigured || !userId || options?.enabled === false) return;
 
+    const sufijo = Math.random().toString(36).slice(2, 8);
     const channel = supabase
-      .channel(`conversaciones-${userId}`)
+      .channel(`conversaciones-${userId}-${sufijo}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "conversaciones" },
@@ -82,6 +93,28 @@ export function useConversaciones(options?: { enabled?: boolean }) {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "mensajes" },
+        (payload) => {
+          const nuevo = payload.new as Partial<MensajeRow> | undefined;
+          if (
+            nuevo?.id &&
+            nuevo.remitente_id &&
+            nuevo.remitente_id !== userId &&
+            nuevo.conversacion_id !== conversacionEnFocoId &&
+            !mensajesNotificados.has(nuevo.id)
+          ) {
+            mensajesNotificados.add(nuevo.id);
+            const extracto =
+              nuevo.cuerpo && nuevo.cuerpo.length > 55
+                ? `${nuevo.cuerpo.slice(0, 55)}…`
+                : nuevo.cuerpo || "Tenés una nueva consulta";
+            showToast(`Nuevo mensaje en el chat: «${extracto}»`, "info");
+          }
+          queryClient.invalidateQueries({ queryKey: ["conversaciones"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "mensajes" },
         () => {
           queryClient.invalidateQueries({ queryKey: ["conversaciones"] });
         }
@@ -91,7 +124,7 @@ export function useConversaciones(options?: { enabled?: boolean }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient, userId]);
+  }, [options?.enabled, queryClient, userId]);
 
   return useQuery({
     queryKey: ["conversaciones", userId],
@@ -139,26 +172,41 @@ export function useConversaciones(options?: { enabled?: boolean }) {
 
       const { data: ultimosData } = await supabase
         .from("mensajes")
-        .select("conversacion_id, cuerpo, creado_en, remitente_id")
+        .select("conversacion_id, cuerpo, creado_en, remitente_id, leido_en")
         .in("conversacion_id", convIds)
         .order("creado_en", { ascending: false });
 
       const ultimoPorConv = new Map<
         string,
-        { cuerpo: string; creado_en: string; remitente_id: string }
+        {
+          cuerpo: string;
+          creado_en: string;
+          remitente_id: string;
+          leido_en?: string | null;
+        }
       >();
+      const noLeidosPorConv = new Map<string, number>();
+
       for (const m of (ultimosData ?? []) as {
         conversacion_id: string;
         cuerpo: string;
         creado_en: string;
         remitente_id: string;
+        leido_en?: string | null;
       }[]) {
         if (!ultimoPorConv.has(m.conversacion_id)) {
           ultimoPorConv.set(m.conversacion_id, {
             cuerpo: m.cuerpo,
             creado_en: m.creado_en,
             remitente_id: m.remitente_id,
+            leido_en: m.leido_en ?? null,
           });
+        }
+        if (m.remitente_id !== userId && !m.leido_en) {
+          noLeidosPorConv.set(
+            m.conversacion_id,
+            (noLeidosPorConv.get(m.conversacion_id) ?? 0) + 1
+          );
         }
       }
 
@@ -191,13 +239,43 @@ export function useConversaciones(options?: { enabled?: boolean }) {
           ...c,
           contraparte_id: contraparteId,
           contraparte_alias: aliasPorId.get(contraparteId) ?? "Usu****",
+          no_leidos: noLeidosPorConv.get(c.id) ?? 0,
           ultimo_mensaje: ultimoPorConv.get(c.id) ?? null,
         } as ConversacionResumen;
       });
     },
     enabled: Boolean(userId) && (options?.enabled ?? true) && isSupabaseConfigured,
-    refetchInterval: 15000,
+    refetchInterval: 10000,
   });
+}
+
+/**
+ * Total de mensajes sin leer en todas las conversaciones del usuario actual
+ * (para el badge de notificación en la barra de navegación).
+ */
+export function useMensajesSinLeer(options?: { enabled?: boolean }): number {
+  const { data } = useConversaciones(options);
+  return (data ?? []).reduce((total, conv) => total + (conv.no_leidos ?? 0), 0);
+}
+
+/**
+ * Marca como leídos todos los mensajes recibidos de la contraparte en una conversación.
+ */
+export async function marcarConversacionLeida(
+  conversacionId: string
+): Promise<void> {
+  if (!isSupabaseConfigured || !conversacionId) return;
+  const { error } = await supabase.rpc("marcar_mensajes_leidos", {
+    p_conversacion_id: conversacionId,
+  });
+  if (error) {
+    // Fallback por UPDATE directo si el RPC no estuviera disponible
+    await supabase
+      .from("mensajes")
+      .update({ leido_en: new Date().toISOString() })
+      .eq("conversacion_id", conversacionId)
+      .is("leido_en", null);
+  }
 }
 
 /**
@@ -351,7 +429,7 @@ export function useMensajes(conversacionId?: string | null) {
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "mensajes",
           filter: `conversacion_id=eq.${conversacionId}`,
@@ -374,7 +452,7 @@ export function useMensajes(conversacionId?: string | null) {
       if (!conversacionId) return [];
       const { data, error } = await supabase
         .from("mensajes")
-        .select("id, conversacion_id, remitente_id, cuerpo, creado_en")
+        .select("id, conversacion_id, remitente_id, cuerpo, creado_en, leido_en")
         .eq("conversacion_id", conversacionId)
         .order("creado_en", { ascending: true });
 

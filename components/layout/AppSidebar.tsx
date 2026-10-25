@@ -3,6 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import { usePathname, useRouter } from "expo-router";
 import { useAuthStore } from "store/authStore";
 import { usePendientesMatch } from "lib/hooks/useMatches";
+import { useMensajesSinLeer } from "lib/hooks/useChat";
 import { Icon } from "components/ui/Icon";
 import { Avatar } from "components/ui/Avatar";
 import { Logo } from "components/ui/Logo";
@@ -26,6 +27,7 @@ export function AppSidebar() {
 
   const activo = activeNavItem(pathname);
   const pendientes = usePendientesMatch({ enabled: !!profile });
+  const mensajesSinLeer = useMensajesSinLeer({ enabled: !!profile });
 
   return (
     <View className="h-full w-[264px] shrink-0 border-r border-line-soft bg-surface px-4 py-6">
@@ -42,6 +44,12 @@ export function AppSidebar() {
       <View className="gap-1">
         {NAV_ITEMS.map((item) => {
           const focused = activo?.name === item.name;
+          const badge =
+            item.name === "matches"
+              ? pendientes
+              : item.name === "chat"
+                ? mensajesSinLeer
+                : 0;
 
           return (
             <Pressable
@@ -54,11 +62,20 @@ export function AppSidebar() {
                 focused ? "bg-sage-50" : "active:bg-surface-sunk",
               ].join(" ")}
             >
-              <Icon
-                name={item.icon}
-                size={18}
-                className={focused ? "text-sage-600" : "text-ink-muted"}
-              />
+              <View className="relative">
+                <Icon
+                  name={item.icon}
+                  size={18}
+                  className={focused ? "text-sage-600" : "text-ink-muted"}
+                />
+                {item.name === "chat" && mensajesSinLeer > 0 ? (
+                  <View className="absolute -right-2 -top-1.5 min-w-[16px] items-center justify-center rounded-full bg-clay-500 px-1">
+                    <Text className="text-[9px] font-bold leading-3.5 text-white">
+                      {mensajesSinLeer > 99 ? "99+" : mensajesSinLeer}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
               <Text
                 className={[
                   "text-sm",
@@ -67,9 +84,11 @@ export function AppSidebar() {
               >
                 {item.title}
               </Text>
-              {item.name === "matches" && pendientes > 0 ? (
+              {badge > 0 ? (
                 <View className="ml-auto min-w-[20px] items-center justify-center rounded-full bg-clay-500 px-1.5 py-0.5">
-                  <Text className="text-[10px] font-bold text-white">{pendientes}</Text>
+                  <Text className="text-[10px] font-bold text-white">
+                    {badge > 99 ? "99+" : badge}
+                  </Text>
                 </View>
               ) : null}
             </Pressable>

@@ -12,6 +12,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   enviarMensaje,
   iniciarOAbrirConversacion,
+  marcarConversacionLeida,
+  setConversacionEnFoco,
   useBorradorConsulta,
   useConversaciones,
   useMensajes,
@@ -196,6 +198,41 @@ export default function ChatScreen() {
     [conversacionActiva, mensajesData]
   );
 
+  // Indicar qué conversación está en foco para evitar notificaciones duplicadas
+  useEffect(() => {
+    setConversacionEnFoco(conversacionActiva?.id ?? null);
+    return () => {
+      setConversacionEnFoco(null);
+    };
+  }, [conversacionActiva?.id]);
+
+  // Marcar mensajes como leídos apenas el usuario abre la conversación activa
+  const tieneNoLeidosEnHilo = useMemo(
+    () =>
+      Boolean(
+        user?.id &&
+          ((conversacionActiva?.no_leidos ?? 0) > 0 ||
+            mensajes.some((m) => m.remitente_id !== user.id && !m.leido_en))
+      ),
+    [conversacionActiva?.no_leidos, mensajes, user?.id]
+  );
+
+  useEffect(() => {
+    const convId = conversacionActiva?.id;
+    if (!convId || !tieneNoLeidosEnHilo) return;
+
+    let cancelado = false;
+    marcarConversacionLeida(convId).then(() => {
+      if (cancelado) return;
+      queryClient.invalidateQueries({ queryKey: ["conversaciones"] });
+      queryClient.invalidateQueries({ queryKey: ["mensajes", convId] });
+    });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [conversacionActiva?.id, queryClient, tieneNoLeidosEnHilo]);
+
   useEffect(() => {
     if (mensajes.length > 0) {
       const timer = setTimeout(() => {
@@ -374,6 +411,7 @@ export default function ChatScreen() {
                   {conversaciones.map((conv) => {
                     const activa =
                       !viendoBorrador && conv.id === seleccionadaId;
+                    const sinLeer = conv.no_leidos ?? 0;
                     return (
                       <Pressable
                         key={conv.id}
@@ -386,11 +424,20 @@ export default function ChatScreen() {
                           activa ? "bg-sage-50" : "active:bg-surface-sunk",
                         ].join(" ")}
                       >
-                        <Avatar
-                          uri={null}
-                          nombre={conv.contraparte_alias}
-                          size={40}
-                        />
+                        <View className="relative">
+                          <Avatar
+                            uri={null}
+                            nombre={conv.contraparte_alias}
+                            size={40}
+                          />
+                          {sinLeer > 0 ? (
+                            <View className="absolute -right-1 -top-1 min-w-[18px] items-center justify-center rounded-full bg-clay-500 px-1 py-0.5">
+                              <Text className="text-[10px] font-bold leading-3.5 text-white">
+                                {sinLeer > 99 ? "99+" : sinLeer}
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
                         <View className="min-w-0 flex-1 gap-0.5">
                           <View className="flex-row items-center justify-between gap-2">
                             <Text
@@ -400,7 +447,14 @@ export default function ChatScreen() {
                               {conv.contraparte_alias}
                             </Text>
                             {conv.ultimo_mensaje?.creado_en ? (
-                              <Text className="text-[10px] text-ink-muted">
+                              <Text
+                                className={[
+                                  "text-[10px]",
+                                  sinLeer > 0
+                                    ? "font-bold text-clay-600"
+                                    : "text-ink-muted",
+                                ].join(" ")}
+                              >
                                 {formatearHora(conv.ultimo_mensaje.creado_en)}
                               </Text>
                             ) : null}
@@ -412,7 +466,12 @@ export default function ChatScreen() {
                             {resumenContexto(conv)}
                           </Text>
                           <Text
-                            className="text-xs text-ink-muted"
+                            className={[
+                              "text-xs",
+                              sinLeer > 0
+                                ? "font-semibold text-ink"
+                                : "text-ink-muted",
+                            ].join(" ")}
                             numberOfLines={1}
                           >
                             {conv.ultimo_mensaje?.cuerpo ?? ""}
@@ -554,6 +613,11 @@ export default function ChatScreen() {
                                 ].join(" ")}
                               >
                                 {formatearHora(msg.creado_en)}
+                                {esMio
+                                  ? msg.leido_en
+                                    ? " · Leído"
+                                    : " · Enviado"
+                                  : ""}
                               </Text>
                             </View>
                           );
