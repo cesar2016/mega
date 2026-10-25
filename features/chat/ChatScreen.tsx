@@ -13,7 +13,6 @@ import {
   enviarMensaje,
   iniciarOAbrirConversacion,
   marcarConversacionLeida,
-  setConversacionEnFoco,
   useBorradorConsulta,
   useConversaciones,
   useMensajes,
@@ -198,40 +197,22 @@ export default function ChatScreen() {
     [conversacionActiva, mensajesData]
   );
 
-  // Indicar qué conversación está en foco para evitar notificaciones duplicadas
-  useEffect(() => {
-    setConversacionEnFoco(conversacionActiva?.id ?? null);
-    return () => {
-      setConversacionEnFoco(null);
-    };
-  }, [conversacionActiva?.id]);
+  const confirmarLectura = async (convIdExplicito?: string | null) => {
+    const id = convIdExplicito ?? conversacionActiva?.id ?? null;
+    if (!id || !user?.id) return;
+    const conv = conversaciones.find((c) => c.id === id);
+    const haySinLeer =
+      (conv?.no_leidos ?? 0) > 0 ||
+      (id === conversacionActiva?.id &&
+        mensajes.some((m) => m.remitente_id !== user.id && !m.leido_en));
+    if (!haySinLeer) return;
 
-  // Marcar mensajes como leídos apenas el usuario abre la conversación activa
-  const tieneNoLeidosEnHilo = useMemo(
-    () =>
-      Boolean(
-        user?.id &&
-          ((conversacionActiva?.no_leidos ?? 0) > 0 ||
-            mensajes.some((m) => m.remitente_id !== user.id && !m.leido_en))
-      ),
-    [conversacionActiva?.no_leidos, mensajes, user?.id]
-  );
-
-  useEffect(() => {
-    const convId = conversacionActiva?.id;
-    if (!convId || !tieneNoLeidosEnHilo) return;
-
-    let cancelado = false;
-    marcarConversacionLeida(convId).then(() => {
-      if (cancelado) return;
-      queryClient.invalidateQueries({ queryKey: ["conversaciones"] });
-      queryClient.invalidateQueries({ queryKey: ["mensajes", convId] });
-    });
-
-    return () => {
-      cancelado = true;
-    };
-  }, [conversacionActiva?.id, queryClient, tieneNoLeidosEnHilo]);
+    await marcarConversacionLeida(id);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["conversaciones"] }),
+      queryClient.invalidateQueries({ queryKey: ["mensajes", id] }),
+    ]);
+  };
 
   useEffect(() => {
     if (mensajes.length > 0) {
@@ -277,6 +258,7 @@ export default function ChatScreen() {
         remitenteId: user.id,
         cuerpo,
       });
+      await marcarConversacionLeida(convId);
       if (!mensajeExplicito) {
         setTexto("");
       }
@@ -418,6 +400,7 @@ export default function ChatScreen() {
                         onPress={() => {
                           setViendoBorrador(false);
                           setSeleccionadaId(conv.id);
+                          void confirmarLectura(conv.id);
                         }}
                         className={[
                           "flex-row items-center gap-3 px-4 py-3.5",
@@ -665,7 +648,13 @@ export default function ChatScreen() {
                     <View className="flex-row items-center gap-2.5 border-t border-line-soft bg-surface p-3.5">
                       <TextInput
                         value={texto}
-                        onChangeText={setTexto}
+                        onFocus={() => {
+                          void confirmarLectura();
+                        }}
+                        onChangeText={(val) => {
+                          setTexto(val);
+                          void confirmarLectura();
+                        }}
                         placeholder="Escribí tu consulta (sin teléfonos, emails ni redes)..."
                         placeholderTextColor="#7A867E"
                         multiline

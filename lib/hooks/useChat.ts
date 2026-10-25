@@ -61,11 +61,20 @@ export type BorradorConsulta = {
   demandas?: ConversacionResumen["demandas"];
 };
 
-let conversacionEnFocoId: string | null = null;
+let usuarioInicializadoId: string | null = null;
+const mensajesConocidos = new Set<string>();
 const mensajesNotificados = new Set<string>();
 
-export function setConversacionEnFoco(id: string | null) {
-  conversacionEnFocoId = id;
+function notificarMensajeEntrante(cuerpo?: string | null, id?: string) {
+  if (id) {
+    if (mensajesNotificados.has(id)) return;
+    mensajesNotificados.add(id);
+  }
+  const extracto =
+    cuerpo && cuerpo.length > 55
+      ? `${cuerpo.slice(0, 55)}…`
+      : cuerpo || "Tenés una nueva respuesta";
+  showToast(`Nuevo mensaje en el chat: «${extracto}»`, "info");
 }
 
 /**
@@ -88,6 +97,7 @@ export function useConversaciones(options?: { enabled?: boolean }) {
         { event: "*", schema: "public", table: "conversaciones" },
         () => {
           queryClient.invalidateQueries({ queryKey: ["conversaciones"] });
+          queryClient.invalidateQueries({ queryKey: ["mensajes"] });
         }
       )
       .on(
@@ -95,21 +105,12 @@ export function useConversaciones(options?: { enabled?: boolean }) {
         { event: "INSERT", schema: "public", table: "mensajes" },
         (payload) => {
           const nuevo = payload.new as Partial<MensajeRow> | undefined;
-          if (
-            nuevo?.id &&
-            nuevo.remitente_id &&
-            nuevo.remitente_id !== userId &&
-            nuevo.conversacion_id !== conversacionEnFocoId &&
-            !mensajesNotificados.has(nuevo.id)
-          ) {
-            mensajesNotificados.add(nuevo.id);
-            const extracto =
-              nuevo.cuerpo && nuevo.cuerpo.length > 55
-                ? `${nuevo.cuerpo.slice(0, 55)}…`
-                : nuevo.cuerpo || "Tenés una nueva consulta";
-            showToast(`Nuevo mensaje en el chat: «${extracto}»`, "info");
+          if (nuevo?.id && nuevo.remitente_id && nuevo.remitente_id !== userId) {
+            mensajesConocidos.add(nuevo.id);
+            notificarMensajeEntrante(nuevo.cuerpo, nuevo.id);
           }
           queryClient.invalidateQueries({ queryKey: ["conversaciones"] });
+          queryClient.invalidateQueries({ queryKey: ["mensajes"] });
         }
       )
       .on(
@@ -117,6 +118,7 @@ export function useConversaciones(options?: { enabled?: boolean }) {
         { event: "UPDATE", schema: "public", table: "mensajes" },
         () => {
           queryClient.invalidateQueries({ queryKey: ["conversaciones"] });
+          queryClient.invalidateQueries({ queryKey: ["mensajes"] });
         }
       )
       .subscribe();
@@ -130,6 +132,11 @@ export function useConversaciones(options?: { enabled?: boolean }) {
     queryKey: ["conversaciones", userId],
     queryFn: async (): Promise<ConversacionResumen[]> => {
       if (!userId) return [];
+
+      if (usuarioInicializadoId && usuarioInicializadoId !== userId) {
+        mensajesConocidos.clear();
+        usuarioInicializadoId = null;
+      }
 
       const { data: convs, error } = await supabase
         .from("conversaciones")
@@ -166,15 +173,20 @@ export function useConversaciones(options?: { enabled?: boolean }) {
 
       if (error) throw error;
       const filas = (convs ?? []) as any[];
-      if (filas.length === 0) return [];
+      if (filas.length === 0) {
+        usuarioInicializadoId = userId;
+        return [];
+      }
 
       const convIds = filas.map((c) => c.id);
 
       const { data: ultimosData } = await supabase
         .from("mensajes")
-        .select("conversacion_id, cuerpo, creado_en, remitente_id, leido_en")
+        .select("id, conversacion_id, cuerpo, creado_en, remitente_id, leido_en")
         .in("conversacion_id", convIds)
         .order("creado_en", { ascending: false });
+
+      const esCargaInicial = usuarioInicializadoId !== userId;
 
       const ultimoPorConv = new Map<
         string,
@@ -188,12 +200,25 @@ export function useConversaciones(options?: { enabled?: boolean }) {
       const noLeidosPorConv = new Map<string, number>();
 
       for (const m of (ultimosData ?? []) as {
+        id: string;
         conversacion_id: string;
         cuerpo: string;
         creado_en: string;
         remitente_id: string;
         leido_en?: string | null;
       }[]) {
+        if (!esCargaInicial && !mensajesConocidos.has(m.id)) {
+          mensajesConocidos.add(m.id);
+          if (m.remitente_id !== userId && !m.leido_en) {
+            notificarMensajeEntrante(m.cuerpo, m.id);
+            queryClient.invalidateQueries({
+              queryKey: ["mensajes", m.conversacion_id],
+            });
+          }
+        } else {
+          mensajesConocidos.add(m.id);
+        }
+
         if (!ultimoPorConv.has(m.conversacion_id)) {
           ultimoPorConv.set(m.conversacion_id, {
             cuerpo: m.cuerpo,
@@ -209,6 +234,8 @@ export function useConversaciones(options?: { enabled?: boolean }) {
           );
         }
       }
+
+      usuarioInicializadoId = userId;
 
       // Solo considerar conversaciones donde efectivamente se haya iniciado la charla
       const filasConMensajes = filas.filter((c) => ultimoPorConv.has(c.id));
@@ -245,7 +272,7 @@ export function useConversaciones(options?: { enabled?: boolean }) {
       });
     },
     enabled: Boolean(userId) && (options?.enabled ?? true) && isSupabaseConfigured,
-    refetchInterval: 10000,
+    refetchInterval: 4000,
   });
 }
 
