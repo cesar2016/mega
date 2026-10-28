@@ -13,6 +13,7 @@ import { Badge, Card, SectionHeader } from "components/ui/Card";
 import { Button } from "components/ui/Button";
 import { Gradient, Screen } from "components/ui/Screen";
 import { MobileTopBar } from "components/layout/MobileTopBar";
+import { ShareOfferModal } from "./ShareOfferModal";
 import {
   fotosDe,
   mediaOrdenado,
@@ -159,6 +160,7 @@ export default function OfferDetailScreen() {
   const [activoId, setActivoId] = useState<string | null>(null);
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
   const [eliminando, setEliminando] = useState(false);
+  const [shareModalVisible, setShareModalVisible] = useState(false);
 
   const { data, isLoading, error } = useOfertaById(String(id ?? ""));
 
@@ -239,7 +241,13 @@ export default function OfferDetailScreen() {
 
   return (
     <View className="flex-1 bg-canvas">
-      <MobileTopBar title="Publicación" onBack={() => router.back()} />
+      <MobileTopBar
+        title="Publicación"
+        onBack={() => router.back()}
+        action
+        actionIcon="share"
+        onActionPress={() => setShareModalVisible(true)}
+      />
 
       <Screen
         eyebrow={oferta.categoria}
@@ -251,6 +259,12 @@ export default function OfferDetailScreen() {
         }
         action={
           <View className="hidden flex-row items-center gap-2 md:flex">
+            <Button
+              label="Compartir"
+              icon="share"
+              variant="soft"
+              onPress={() => setShareModalVisible(true)}
+            />
             {esPropia ? (
               <Button
                 label="Editar"
@@ -530,10 +544,23 @@ export default function OfferDetailScreen() {
                   className="flex-1"
                 />
               </View>
+
+              <Button
+                label="Compartir en redes sociales"
+                icon="share"
+                variant="soft"
+                onPress={() => setShareModalVisible(true)}
+              />
             </Card>
           </View>
         </View>
       </Screen>
+
+      <ShareOfferModal
+        visible={shareModalVisible}
+        onClose={() => setShareModalVisible(false)}
+        oferta={oferta}
+      />
     </View>
   );
 }
