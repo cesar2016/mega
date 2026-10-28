@@ -560,6 +560,7 @@ export default function OfferDetailScreen() {
         visible={shareModalVisible}
         onClose={() => setShareModalVisible(false)}
         oferta={oferta}
+        portadaUrl={activo?.url ?? portada?.url ?? todos[0]?.url}
       />
     </View>
   );

@@ -12,13 +12,12 @@ import {
 import { Icon } from "components/ui/Icon";
 import { Badge } from "components/ui/Card";
 import { showToast } from "lib/utils";
-import { portadaDe } from "components/ui/OfertaMedia";
+import { mediaOrdenado, parseVideoTrimUrl, portadaDe } from "components/ui/OfertaMedia";
 import type { OfertaMediaRow } from "components/ui/OfertaMedia";
 import {
   FacebookIcon,
   TelegramIcon,
   WhatsAppIcon,
-  XTwitterIcon,
 } from "components/ui/SocialIcons";
 
 export type ShareableOferta = {
@@ -114,14 +113,21 @@ export function ShareOfferModal({
   visible,
   onClose,
   oferta,
+  portadaUrl,
 }: {
   visible: boolean;
   onClose: () => void;
   oferta: ShareableOferta;
+  portadaUrl?: string | null;
 }) {
   const [copiado, setCopiado] = useState(false);
   const payload = buildOfertaSharePayload(oferta);
-  const portada = portadaDe(oferta.oferta_media);
+
+  // Obtener la mejor URL de miniatura (portada elegida, foto activa o primer archivo)
+  const todosMedia = mediaOrdenado(oferta.oferta_media);
+  const portadaMedia = portadaDe(oferta.oferta_media) ?? todosMedia[0] ?? null;
+  const mediaUrl = portadaUrl || portadaMedia?.url || null;
+  const esVideo = (mediaUrl && mediaUrl.includes(".mp4")) || portadaMedia?.tipo === "video";
 
   if (!visible) return null;
 
@@ -146,7 +152,6 @@ export function ShareOfferModal({
       }
     } catch (e) {
       console.error("Error al abrir red social:", e);
-      // Fallback a copiar si no se pudo abrir la app
       await handleCopiar();
     }
   };
@@ -154,11 +159,6 @@ export function ShareOfferModal({
   const shareWhatsApp = () => {
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(payload.fullMessage)}`;
     abrirEnlace(waUrl);
-  };
-
-  const shareX = () => {
-    const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(payload.summary)}&url=${encodeURIComponent(payload.url)}`;
-    abrirEnlace(xUrl);
   };
 
   const shareFacebook = () => {
@@ -235,17 +235,55 @@ export function ShareOfferModal({
           </View>
 
           <View className="gap-4 p-5">
-            {/* Tarjeta resumen del lote */}
+            {/* Tarjeta resumen del lote con miniatura */}
             <View className="flex-row items-center gap-3 rounded-2xl border border-line-soft bg-surface-soft p-3">
-              <View className="h-14 w-14 overflow-hidden rounded-xl bg-surface-sunk">
-                {portada?.url ? (
-                  <Image source={{ uri: portada.url }} className="h-full w-full" />
+              <View className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-line-soft bg-surface-sunk">
+                {mediaUrl ? (
+                  Platform.OS === "web" ? (
+                    esVideo ? (
+                      <video
+                        src={mediaUrl}
+                        muted
+                        playsInline
+                        preload="metadata"
+                        onLoadedMetadata={(e) => {
+                          const { inicio } = parseVideoTrimUrl(mediaUrl);
+                          e.currentTarget.currentTime = inicio ?? 0.1;
+                        }}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          display: "block",
+                          pointerEvents: "none",
+                        }}
+                      />
+                    ) : (
+                      <img
+                        src={mediaUrl}
+                        alt={oferta.raza || oferta.categoria}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          display: "block",
+                        }}
+                      />
+                    )
+                  ) : (
+                    <Image
+                      source={{ uri: mediaUrl }}
+                      style={{ width: 56, height: 56 }}
+                      resizeMode="cover"
+                    />
+                  )
                 ) : (
                   <View className="h-full w-full items-center justify-center bg-sage-50">
-                    <Icon name="beef" size={20} className="text-sage-500" />
+                    <Icon name="beef" size={22} className="text-sage-500" />
                   </View>
                 )}
               </View>
+
               <View className="min-w-0 flex-1 gap-1">
                 <View className="flex-row items-center gap-1.5">
                   <Badge tone="sage">
@@ -270,45 +308,32 @@ export function ShareOfferModal({
                 Compartir en redes
               </Text>
 
-              <View className="grid grid-cols-2 gap-2.5">
-                {/* WhatsApp */}
-                <Pressable
-                  onPress={shareWhatsApp}
-                  accessibilityRole="button"
-                  accessibilityLabel="Compartir en WhatsApp"
-                  className="flex-row items-center gap-2.5 rounded-2xl bg-[#25D366] px-3.5 py-3 shadow-soft active:opacity-90"
-                >
-                  <WhatsAppIcon size={20} color="#FFFFFF" />
-                  <View className="min-w-0 flex-1">
-                    <Text className="text-xs font-bold text-white">WhatsApp</Text>
-                    <Text className="text-[10px] text-white/80" numberOfLines={1}>
-                      Chat o grupo
-                    </Text>
-                  </View>
-                </Pressable>
+              {/* WhatsApp - Destacado */}
+              <Pressable
+                onPress={shareWhatsApp}
+                accessibilityRole="button"
+                accessibilityLabel="Compartir en WhatsApp"
+                className="flex-row items-center gap-3 rounded-2xl bg-[#25D366] px-4 py-3.5 shadow-soft active:opacity-90"
+              >
+                <View className="h-10 w-10 items-center justify-center rounded-xl bg-white/20">
+                  <WhatsAppIcon size={22} color="#FFFFFF" />
+                </View>
+                <View className="min-w-0 flex-1">
+                  <Text className="text-sm font-bold text-white">WhatsApp</Text>
+                  <Text className="text-xs text-white/85" numberOfLines={1}>
+                    Enviar a contactos o grupos de compra-venta
+                  </Text>
+                </View>
+                <Icon name="arrowRight" size={16} className="text-white/80" />
+              </Pressable>
 
-                {/* X (Twitter) */}
-                <Pressable
-                  onPress={shareX}
-                  accessibilityRole="button"
-                  accessibilityLabel="Compartir en X"
-                  className="flex-row items-center gap-2.5 rounded-2xl bg-black px-3.5 py-3 shadow-soft active:opacity-90"
-                >
-                  <XTwitterIcon size={18} color="#FFFFFF" />
-                  <View className="min-w-0 flex-1">
-                    <Text className="text-xs font-bold text-white">X (Twitter)</Text>
-                    <Text className="text-[10px] text-white/80" numberOfLines={1}>
-                      Tu perfil
-                    </Text>
-                  </View>
-                </Pressable>
-
-                {/* Facebook */}
+              {/* Facebook y Telegram en fila */}
+              <View className="flex-row gap-2.5">
                 <Pressable
                   onPress={shareFacebook}
                   accessibilityRole="button"
                   accessibilityLabel="Compartir en Facebook"
-                  className="flex-row items-center gap-2.5 rounded-2xl bg-[#1877F2] px-3.5 py-3 shadow-soft active:opacity-90"
+                  className="flex-1 flex-row items-center gap-2.5 rounded-2xl bg-[#1877F2] px-3.5 py-3 shadow-soft active:opacity-90"
                 >
                   <FacebookIcon size={20} color="#FFFFFF" />
                   <View className="min-w-0 flex-1">
@@ -319,12 +344,11 @@ export function ShareOfferModal({
                   </View>
                 </Pressable>
 
-                {/* Telegram */}
                 <Pressable
                   onPress={shareTelegram}
                   accessibilityRole="button"
                   accessibilityLabel="Compartir en Telegram"
-                  className="flex-row items-center gap-2.5 rounded-2xl bg-[#229ED9] px-3.5 py-3 shadow-soft active:opacity-90"
+                  className="flex-1 flex-row items-center gap-2.5 rounded-2xl bg-[#229ED9] px-3.5 py-3 shadow-soft active:opacity-90"
                 >
                   <TelegramIcon size={20} color="#FFFFFF" />
                   <View className="min-w-0 flex-1">
