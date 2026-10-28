@@ -3,6 +3,10 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/oferta/:id",
+      "destination": "/api/oferta?id=:id"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
