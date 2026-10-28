@@ -1,3 +1,4 @@
+/* eslint-env node */
 const fs = require("fs");
 const path = require("path");
 
@@ -83,7 +84,7 @@ module.exports = async function handler(req, res) {
             media[0];
 
           if (portada?.url) {
-            imagenUrl = portada.url.split("#")[0];
+            imagenUrl = `${protocol}://${host}/api/og-image?id=${id}`;
           }
         }
       }
@@ -107,6 +108,9 @@ module.exports = async function handler(req, res) {
     <title>${escapeHtml(titulo)}</title>
     <meta name="description" content="${escapeHtml(descripcion)}" />
 
+    <!-- Meta / Facebook App ID -->
+    <meta property="fb:app_id" content="966242223397117" />
+
     <!-- Open Graph / Facebook / WhatsApp -->
     <meta property="og:type" content="article" />
     <meta property="og:site_name" content="Mercado Ganadero" />
@@ -115,6 +119,9 @@ module.exports = async function handler(req, res) {
     <meta property="og:description" content="${escapeHtml(descripcion)}" />
     <meta property="og:image" content="${escapeHtml(imagenUrl)}" />
     <meta property="og:image:secure_url" content="${escapeHtml(imagenUrl)}" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="800" />
+    <meta property="og:image:height" content="600" />
     <meta property="og:image:alt" content="${escapeHtml(titulo)}" />
 
     <!-- Twitter -->

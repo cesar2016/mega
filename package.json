@@ -48,6 +48,7 @@
     "react-native-screens": "~4.4.0",
     "react-native-svg": "15.8.0",
     "react-native-web": "~0.19.13",
+    "sharp": "^0.35.5",
     "tailwindcss": "^3.4.19",
     "zod": "^3.23.8",
     "zustand": "^4.5.7"
