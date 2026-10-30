@@ -17,8 +17,8 @@ export default function Root({ children }: PropsWithChildren) {
         <meta property="og:url" content="https://mercadoganadero.app/" />
         <meta property="og:title" content="Mercado Ganadero · Compra y venta de hacienda" />
         <meta property="og:description" content="Plataforma digital para la compra y venta de hacienda en Argentina. Publicá tus lotes, conectá con compradores directos y gestioná tus operaciones de forma simple." />
-        <meta property="og:image" content="https://mercadoganadero.app/og-banner.jpg" />
-        <meta property="og:image:secure_url" content="https://mercadoganadero.app/og-banner.jpg" />
+        <meta property="og:image" content="https://mercadoganadero.app/og-banner-v2.jpg" />
+        <meta property="og:image:secure_url" content="https://mercadoganadero.app/og-banner-v2.jpg" />
         <meta property="og:image:type" content="image/jpeg" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
@@ -27,7 +27,7 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Mercado Ganadero · Compra y venta de hacienda" />
         <meta name="twitter:description" content="Plataforma digital para la compra y venta de hacienda en Argentina." />
-        <meta name="twitter:image" content="https://mercadoganadero.app/og-banner.jpg" />
+        <meta name="twitter:image" content="https://mercadoganadero.app/og-banner-v2.jpg" />
 
         <ScrollViewStyleReset />
       </head>

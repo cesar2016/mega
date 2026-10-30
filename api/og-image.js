@@ -10,6 +10,20 @@ try {
   // Fallback si sharp no está disponible
 }
 
+let cachedLogoBase64 = null;
+function getLogoBase64() {
+  if (cachedLogoBase64) return cachedLogoBase64;
+  try {
+    const logoPath = path.join(process.cwd(), "assets", "logo_mega.png");
+    if (fs.existsSync(logoPath)) {
+      cachedLogoBase64 = fs.readFileSync(logoPath).toString("base64");
+    }
+  } catch (_e) {
+    //
+  }
+  return cachedLogoBase64;
+}
+
 function escapeXml(unsafe) {
   if (!unsafe) return "";
   return String(unsafe)
@@ -30,6 +44,7 @@ function formatPrecio(precio, tipo_precio) {
 
 function generateVideoCardSvg({ titulo, subtitulo, ubicacion, precio }) {
   const lineasDetalle = [ubicacion, precio, subtitulo].filter(Boolean).join(" · ");
+  const logoB64 = getLogoBase64();
 
   return `
 <svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
@@ -53,10 +68,14 @@ function generateVideoCardSvg({ titulo, subtitulo, ubicacion, precio }) {
   <circle cx="80" cy="560" r="260" fill="#1B4332" opacity="0.2"/>
 
   <!-- Logo header -->
-  <g transform="translate(80, 60)">
-    <rect width="48" height="48" rx="12" fill="#1B4332" stroke="#4ADE80" stroke-width="2"/>
-    <text x="24" y="32" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="bold" fill="#4ADE80" text-anchor="middle">MG</text>
-    <text x="66" y="34" font-family="system-ui, -apple-system, sans-serif" font-size="26" font-weight="bold" fill="#FFFFFF" letter-spacing="1">MERCADO GANADERO</text>
+  <g transform="translate(80, 50)">
+    ${
+      logoB64
+        ? `<image href="data:image/png;base64,${logoB64}" x="0" y="0" width="60" height="60" />`
+        : `<rect width="48" height="48" rx="12" fill="#1B4332" stroke="#4ADE80" stroke-width="2"/>
+           <text x="24" y="32" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="bold" fill="#4ADE80" text-anchor="middle">MG</text>`
+    }
+    <text x="${logoB64 ? 75 : 66}" y="40" font-family="system-ui, -apple-system, sans-serif" font-size="26" font-weight="bold" fill="#FFFFFF" letter-spacing="1">MERCADO GANADERO</text>
   </g>
 
   <!-- Boton Play central -->
@@ -209,32 +228,30 @@ module.exports = async function handler(req, res) {
   }
 
   // 3. Fallback: imagen de marca por defecto optimizada (< 100KB)
-  try {
-    const bannerJpg = path.join(process.cwd(), "public", "og-banner.jpg");
-    if (fs.existsSync(bannerJpg)) {
-      const bannerBuf = fs.readFileSync(bannerJpg);
-      res.setHeader("Content-Type", "image/jpeg");
-      res.setHeader("Content-Length", String(bannerBuf.length));
-      res.setHeader(
-        "Cache-Control",
-        "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400"
-      );
-      return res.status(200).send(bannerBuf);
-    }
+  const candidateFiles = [
+    "og-banner-v2.jpg",
+    "og-banner.jpg",
+    "og-banner-v2.png",
+    "og-banner.png",
+  ];
 
-    const bannerPng = path.join(process.cwd(), "public", "og-banner.png");
-    if (fs.existsSync(bannerPng)) {
-      const bannerBuf = fs.readFileSync(bannerPng);
-      res.setHeader("Content-Type", "image/png");
-      res.setHeader("Content-Length", String(bannerBuf.length));
-      res.setHeader(
-        "Cache-Control",
-        "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400"
-      );
-      return res.status(200).send(bannerBuf);
+  for (const file of candidateFiles) {
+    try {
+      const bannerPath = path.join(process.cwd(), "public", file);
+      if (fs.existsSync(bannerPath)) {
+        const bannerBuf = fs.readFileSync(bannerPath);
+        const mime = file.endsWith(".png") ? "image/png" : "image/jpeg";
+        res.setHeader("Content-Type", mime);
+        res.setHeader("Content-Length", String(bannerBuf.length));
+        res.setHeader(
+          "Cache-Control",
+          "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400"
+        );
+        return res.status(200).send(bannerBuf);
+      }
+    } catch (_e) {
+      //
     }
-  } catch (_e) {
-    //
   }
 
   return res.status(404).send("Image not found");

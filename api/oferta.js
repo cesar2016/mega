@@ -28,7 +28,7 @@ module.exports = async function handler(req, res) {
     "mercadoganadero.app";
   const protocol = req.headers["x-forwarded-proto"] || "https";
   const canonicalUrl = `${protocol}://${host}/oferta/${id || ""}`;
-  const defaultImage = `${protocol}://${host}/og-banner.jpg`;
+  const defaultImage = `${protocol}://${host}/og-banner-v2.jpg`;
 
   let titulo = "Mercado Ganadero · Compra y venta de hacienda";
   let descripcion =

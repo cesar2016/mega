@@ -15,7 +15,12 @@ if (!fs.existsSync(indexPath)) {
 
 // Asegurar que los banners optimizados existan en dist/
 const publicDir = path.join(rootDir, "public");
-for (const file of ["og-banner.jpg", "og-banner.png"]) {
+for (const file of [
+  "og-banner.jpg",
+  "og-banner.png",
+  "og-banner-v2.jpg",
+  "og-banner-v2.png",
+]) {
   const src = path.join(publicDir, file);
   const dest = path.join(distDir, file);
   if (fs.existsSync(src)) {
@@ -38,8 +43,8 @@ const metaTags = `
     <meta property="og:url" content="https://mercadoganadero.app/" />
     <meta property="og:title" content="Mercado Ganadero · Compra y venta de hacienda" />
     <meta property="og:description" content="Plataforma digital para la compra y venta de hacienda en Argentina. Publicá tus lotes, conectá con compradores directos y gestioná tus operaciones de forma simple." />
-    <meta property="og:image" content="https://mercadoganadero.app/og-banner.jpg" />
-    <meta property="og:image:secure_url" content="https://mercadoganadero.app/og-banner.jpg" />
+    <meta property="og:image" content="https://mercadoganadero.app/og-banner-v2.jpg" />
+    <meta property="og:image:secure_url" content="https://mercadoganadero.app/og-banner-v2.jpg" />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -49,7 +54,7 @@ const metaTags = `
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Mercado Ganadero · Compra y venta de hacienda" />
     <meta name="twitter:description" content="Plataforma digital para la compra y venta de hacienda en Argentina." />
-    <meta name="twitter:image" content="https://mercadoganadero.app/og-banner.jpg" />
+    <meta name="twitter:image" content="https://mercadoganadero.app/og-banner-v2.jpg" />
 `;
 
 // Limpiar títulos o metas duplicados si existieran
