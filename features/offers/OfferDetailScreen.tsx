@@ -14,6 +14,7 @@ import { Button } from "components/ui/Button";
 import { Gradient, Screen } from "components/ui/Screen";
 import { MobileTopBar } from "components/layout/MobileTopBar";
 import { ShareOfferModal } from "./ShareOfferModal";
+import { AuthPromptModal } from "features/auth/AuthPromptModal";
 import {
   fotosDe,
   mediaOrdenado,
@@ -161,6 +162,16 @@ export default function OfferDetailScreen() {
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
   const [eliminando, setEliminando] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [authModalVisible, setAuthModalVisible] = useState(false);
+  const [authModalMotivo, setAuthModalMotivo] = useState<"chat" | "flete">("chat");
+
+  const onVolver = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace(user ? "/(main)/tabs/feed" : "/auth");
+    }
+  };
 
   const { data, isLoading, error } = useOfertaById(String(id ?? ""));
 
@@ -176,13 +187,13 @@ export default function OfferDetailScreen() {
   if (error || !data) {
     return (
       <View className="flex-1 bg-canvas">
-        <MobileTopBar title="Publicación" onBack={() => router.back()} />
+        <MobileTopBar title="Publicación" onBack={onVolver} />
         <Screen>
           <EmptyState
             icon="alert"
             title="No encontramos la publicación"
             description={error ? String((error as Error).message ?? error) : "Puede que haya sido retirada."}
-            action={<Button label="Volver al mercado" icon="arrowLeft" onPress={() => router.replace("/(main)/tabs/feed")} />}
+            action={<Button label="Volver al mercado" icon="arrowLeft" onPress={onVolver} />}
           />
         </Screen>
       </View>
@@ -198,6 +209,12 @@ export default function OfferDetailScreen() {
   const activo = todos.find((item) => item.id === activoId) ?? portada ?? todos[0] ?? null;
 
   const irAlChat = () => {
+    if (!user) {
+      setAuthModalMotivo("chat");
+      setAuthModalVisible(true);
+      return;
+    }
+
     if (esPropia || !isSupabaseConfigured) {
       router.push("/(main)/tabs/chat");
       return;
@@ -214,6 +231,16 @@ export default function OfferDetailScreen() {
       params: { ofertaId: oferta.id },
     });
   };
+
+  const pedirFlete = () => {
+    if (!user) {
+      setAuthModalMotivo("flete");
+      setAuthModalVisible(true);
+      return;
+    }
+    showToast("La solicitud de flete llega en la próxima versión", "info");
+  };
+
   const irAEditar = () =>
     router.push({ pathname: "/(main)/oferta-nueva", params: { id: oferta.id } });
 
@@ -243,7 +270,7 @@ export default function OfferDetailScreen() {
     <View className="flex-1 bg-canvas">
       <MobileTopBar
         title="Publicación"
-        onBack={() => router.back()}
+        onBack={onVolver}
         action
         actionIcon="share"
         onActionPress={() => setShareModalVisible(true)}
@@ -277,7 +304,7 @@ export default function OfferDetailScreen() {
               label="Volver"
               icon="arrowLeft"
               variant="secondary"
-              onPress={() => router.back()}
+              onPress={onVolver}
             />
           </View>
         }
@@ -527,6 +554,15 @@ export default function OfferDetailScreen() {
                 </Text>
               </View>
 
+              {!user ? (
+                <View className="flex-row items-center gap-2 rounded-2xl border border-sage-200 bg-sage-50/90 px-3 py-2">
+                  <Icon name="info" size={14} className="text-sage-700" />
+                  <Text className="flex-1 text-[11px] leading-4 text-sage-800">
+                    Iniciá sesión o registrate gratis para consultar directamente por este lote o cotizar flete.
+                  </Text>
+                </View>
+              ) : null}
+
               <View className="flex-row gap-2">
                 <Button
                   label={esPropia ? "Ver consultas" : "Consultar por chat"}
@@ -538,9 +574,7 @@ export default function OfferDetailScreen() {
                   label="Pedir flete"
                   icon="truck"
                   variant="secondary"
-                  onPress={() =>
-                    showToast("La solicitud de flete llega en la próxima versión", "info")
-                  }
+                  onPress={pedirFlete}
                   className="flex-1"
                 />
               </View>
@@ -561,6 +595,20 @@ export default function OfferDetailScreen() {
         onClose={() => setShareModalVisible(false)}
         oferta={oferta}
         portadaUrl={activo?.url ?? portada?.url ?? todos[0]?.url}
+      />
+
+      <AuthPromptModal
+        visible={authModalVisible}
+        onClose={() => setAuthModalVisible(false)}
+        motivo={authModalMotivo}
+        returnUrl={`/oferta/${oferta.id}`}
+        ofertaSummary={{
+          categoria: oferta.categoria,
+          raza: oferta.raza,
+          cantidad: oferta.cantidad,
+          precio: oferta.precio,
+          tipo_precio: oferta.tipo_precio,
+        }}
       />
     </View>
   );

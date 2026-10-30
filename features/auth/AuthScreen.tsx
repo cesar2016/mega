@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { z } from "zod";
 import { supabase } from "lib/supabase";
 import { showToast } from "lib/utils";
@@ -56,7 +57,11 @@ function traducirErrorAuth(raw?: string): string {
 }
 
 export default function AuthScreen() {
-  const [mode, setMode] = useState<Mode>("login");
+  const router = useRouter();
+  const params = useLocalSearchParams<{ mode?: string; returnUrl?: string }>();
+  const [mode, setMode] = useState<Mode>(
+    params.mode === "registro" ? "registro" : "login"
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nombre, setNombre] = useState("");
@@ -65,6 +70,12 @@ export default function AuthScreen() {
   const [emailPendiente, setEmailPendiente] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [reenviando, setReenviando] = useState(false);
+
+  useEffect(() => {
+    if (params.mode === "registro" || params.mode === "login") {
+      setMode(params.mode);
+    }
+  }, [params.mode]);
 
   const onSubmit = async () => {
     setError(null);
@@ -233,6 +244,20 @@ export default function AuthScreen() {
             <BackgroundVideo />
 
             <View className="relative z-10 w-full max-w-md gap-6">
+              {params.returnUrl ? (
+                <Pressable
+                  onPress={() => router.push(params.returnUrl as any)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Volver a la publicación"
+                  className="flex-row items-center gap-2 self-start rounded-full border border-line-soft bg-white/95 px-3.5 py-2 shadow-sm active:bg-white"
+                >
+                  <Icon name="arrowLeft" size={14} className="text-ink-soft" />
+                  <Text className="text-xs font-semibold text-ink-soft">
+                    Volver a la publicación
+                  </Text>
+                </Pressable>
+              ) : null}
+
               {/* Marca en mobile / tablet */}
               <View className="items-center gap-2 rounded-2xl border border-line-soft bg-white/90 px-4 py-3.5 shadow-sm lg:hidden">
                 <Logo size={68} className="rounded-full shadow-md" />

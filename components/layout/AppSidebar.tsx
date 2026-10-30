@@ -100,7 +100,7 @@ export function AppSidebar() {
 
       {/* Acción principal */}
       <Pressable
-        onPress={() => router.push("/(main)/oferta-nueva")}
+        onPress={() => router.push(profile ? "/(main)/oferta-nueva" : "/auth")}
         accessibilityRole="button"
         accessibilityLabel="Publicar oferta"
         className="mb-4 flex-row items-center justify-center gap-2 rounded-2xl bg-sage-500 px-4 py-3 active:bg-sage-600"
@@ -110,25 +110,37 @@ export function AppSidebar() {
       </Pressable>
 
       {/* Usuario */}
-      <View className="flex-row items-center gap-3 rounded-2xl border border-line-soft bg-surface-soft px-3 py-2.5">
-        <Avatar uri={profile?.avatar_url} nombre={profile?.nombre} size={36} />
-        <View className="min-w-0 flex-1">
-          <Text className="text-[13px] font-semibold text-ink" numberOfLines={1}>
-            {profile?.nombre ?? "Invitado"}
-          </Text>
-          <Text className="text-[11px] capitalize text-ink-muted" numberOfLines={1}>
-            {ROLE_LABEL[profile?.rol ?? ""] ?? "Mercado"}
-          </Text>
+      {profile ? (
+        <View className="flex-row items-center gap-3 rounded-2xl border border-line-soft bg-surface-soft px-3 py-2.5">
+          <Avatar uri={profile?.avatar_url} nombre={profile?.nombre} size={36} />
+          <View className="min-w-0 flex-1">
+            <Text className="text-[13px] font-semibold text-ink" numberOfLines={1}>
+              {profile.nombre}
+            </Text>
+            <Text className="text-[11px] capitalize text-ink-muted" numberOfLines={1}>
+              {ROLE_LABEL[profile.rol ?? ""] ?? "Mercado"}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => router.push("/(main)/tabs/perfil")}
+            accessibilityRole="button"
+            accessibilityLabel="Ver perfil"
+            className="h-8 w-8 items-center justify-center rounded-lg active:bg-surface-sunk"
+          >
+            <Icon name="chevronRight" size={16} className="text-ink-muted" />
+          </Pressable>
         </View>
+      ) : (
         <Pressable
-          onPress={() => router.push("/(main)/tabs/perfil")}
+          onPress={() => router.push("/auth")}
           accessibilityRole="button"
-          accessibilityLabel="Ver perfil"
-          className="h-8 w-8 items-center justify-center rounded-lg active:bg-surface-sunk"
+          accessibilityLabel="Iniciar sesión o registrarse"
+          className="flex-row items-center justify-center gap-2 rounded-2xl border border-sage-200 bg-sage-50 px-3.5 py-3 active:bg-sage-100"
         >
-          <Icon name="chevronRight" size={16} className="text-ink-muted" />
+          <Icon name="user" size={16} className="text-sage-700" />
+          <Text className="text-xs font-bold text-sage-800">Iniciar sesión / Registrarse</Text>
         </Pressable>
-      </View>
+      )}
     </View>
   );
 }

@@ -1,4 +1,4 @@
-import { Redirect, Slot, Stack } from "expo-router";
+import { Redirect, Slot, Stack, usePathname, useSegments } from "expo-router";
 import { View } from "react-native";
 import { isSupabaseConfigured } from "lib/supabase";
 import { useAuthRedirect } from "lib/hooks/useAuthRedirect";
@@ -7,18 +7,27 @@ import { useAuthStore } from "store/authStore";
 import { AppSidebar } from "components/layout/AppSidebar";
 
 export default function MainLayout() {
+  const user = useAuthStore((state) => state.user);
   const profile = useAuthStore((state) => state.profile);
   const loading = useAuthStore((state) => state.loading);
   const { isWide } = useResponsive();
+  const pathname = usePathname();
+  const segments = useSegments();
 
-  const redirect = useAuthRedirect();
+  // Las URLs de publicaciones (/oferta/:id) son públicas:
+  // los visitantes sin sesión deben poder ingresar directamente a ver el lote.
+  const isPublicRoute =
+    pathname?.startsWith("/oferta/") ||
+    (segments as string[])?.includes("oferta");
+
+  const redirect = useAuthRedirect({ enabled: !isPublicRoute });
   if (redirect) return redirect;
 
   if (loading) return null;
 
   // Sólo con Supabase configurado tiene sentido proteger las rutas: en modo
   // demo no hay sesión real y la app debe poder navegar libremente.
-  if (isSupabaseConfigured && profile?.onboarding_completado === false) {
+  if (isSupabaseConfigured && user && profile?.onboarding_completado === false) {
     return <Redirect href="/onboarding" />;
   }
 
