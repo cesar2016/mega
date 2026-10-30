@@ -109,6 +109,7 @@ module.exports = async function handler(req, res) {
   const { id, url: customUrl } = req.query;
 
   let targetImageUrl = customUrl ? decodeURIComponent(customUrl) : null;
+  let isVideoThumbnail = false;
   let videoOffer = null;
 
   if (!targetImageUrl && id) {
@@ -149,8 +150,30 @@ module.exports = async function handler(req, res) {
           if (fotoPortada?.url) {
             targetImageUrl = fotoPortada.url.split("#")[0];
           } else if (videoPortada?.url) {
-            // No pasar video MP4 a sharp; generar tarjeta visual de video
-            videoOffer = oferta;
+            // Verificar si existe la miniatura _thumb.jpg del video en Storage
+            const cleanVideoUrl = videoPortada.url.split("#")[0];
+            const candidateThumbUrl = cleanVideoUrl.replace(/\.mp4$/i, "_thumb.jpg");
+
+            try {
+              const headCtrl = new AbortController();
+              const headTimeout = setTimeout(() => headCtrl.abort(), 2000);
+              const checkRes = await fetch(candidateThumbUrl, {
+                method: "HEAD",
+                signal: headCtrl.signal,
+              });
+              clearTimeout(headTimeout);
+
+              if (checkRes.ok) {
+                targetImageUrl = candidateThumbUrl;
+                isVideoThumbnail = true;
+              }
+            } catch (_e) {
+              //
+            }
+
+            if (!targetImageUrl) {
+              videoOffer = oferta;
+            }
           }
         }
       }
@@ -159,7 +182,7 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // 1. Si tenemos foto de la oferta, procesarla y devolver JPEG optimizado (< 100KB)
+  // 1. Si tenemos foto de la oferta o miniatura real de video, procesarla y devolver JPEG optimizado (< 150KB)
   if (targetImageUrl) {
     try {
       const controller = new AbortController();
@@ -172,8 +195,50 @@ module.exports = async function handler(req, res) {
         const buffer = Buffer.from(arrayBuf);
 
         if (sharp) {
-          const optimized = await sharp(buffer)
-            .resize(1200, 630, { fit: "cover", position: "centre" })
+          const width = 1200;
+          const height = 630;
+          let pipeline = sharp(buffer).resize(width, height, { fit: "cover", position: "centre" });
+
+          // Si es un video, superponer el icono de reproducción (triángulo blanco centrado)
+          if (isVideoThumbnail) {
+            const playSvg = `
+            <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+              <rect width="${width}" height="${height}" fill="black" opacity="0.15"/>
+              <!-- Centro: Botón Play translúcido con triángulo -->
+              <g transform="translate(${width / 2}, ${height / 2})">
+                <circle cx="0" cy="0" r="70" fill="black" opacity="0.4"/>
+                <circle cx="0" cy="0" r="64" fill="rgba(0,0,0,0.65)" stroke="white" stroke-width="4"/>
+                <polygon points="-14,-26 26,0 -14,26" fill="white"/>
+              </g>
+              <!-- Distintivo Superior: Marca -->
+              <g transform="translate(60, 50)">
+                <rect width="250" height="42" rx="21" fill="rgba(0,0,0,0.7)"/>
+                <text x="125" y="27" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="bold" fill="#4ADE80" text-anchor="middle" letter-spacing="1">MERCADO GANADERO</text>
+              </g>
+              <!-- Distintivo Inferior: Video del lote -->
+              <g transform="translate(60, 538)">
+                <rect width="180" height="38" rx="19" fill="#D97706"/>
+                <text x="90" y="24" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold" fill="white" text-anchor="middle" letter-spacing="1">▶ VIDEO DEL LOTE</text>
+              </g>
+            </svg>
+            `;
+
+            const baseFrameBuf = await pipeline.toBuffer();
+            const withPlayBuf = await sharp(baseFrameBuf)
+              .composite([{ input: Buffer.from(playSvg), top: 0, left: 0 }])
+              .jpeg({ quality: 82, progressive: true })
+              .toBuffer();
+
+            res.setHeader("Content-Type", "image/jpeg");
+            res.setHeader("Content-Length", String(withPlayBuf.length));
+            res.setHeader(
+              "Cache-Control",
+              "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400"
+            );
+            return res.status(200).send(withPlayBuf);
+          }
+
+          const optimized = await pipeline
             .jpeg({ quality: 80, progressive: true })
             .toBuffer();
 
@@ -194,7 +259,7 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // 2. Si la oferta tiene solo video, generar tarjeta gráfica con los datos y badge de video
+  // 2. Si la oferta tiene solo video pero no hay captura extraída, generar tarjeta con logo
   if (videoOffer && sharp) {
     try {
       const cat = videoOffer.categoria || "Hacienda";

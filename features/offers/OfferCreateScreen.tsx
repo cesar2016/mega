@@ -22,7 +22,7 @@ import {
 } from "lib/hooks/useOfferDB";
 import { showToast } from "lib/utils";
 import { detectarDatosContacto } from "lib/contactFilter";
-import { extensionForMime, toUploadBody } from "lib/upload";
+import { extensionForMime, extractVideoThumbnailBlob, toUploadBody } from "lib/upload";
 import { useAuthStore } from "store/authStore";
 import { Icon } from "components/ui/Icon";
 import { EmptyState } from "components/ui/Avatar";
@@ -238,6 +238,21 @@ export default function OfferCreateScreen() {
 
           const { data } = supabase.storage.from("oferta_media").getPublicUrl(path);
           baseVideoUrl = data.publicUrl;
+
+          // Extraer y subir fotograma miniatura para OpenGraph / redes sociales
+          try {
+            const thumbBlob = await extractVideoThumbnailBlob(video.uri, video.trimInicio ?? 1);
+            if (thumbBlob) {
+              const thumbPath = `${user.id}/${video.id}_thumb.jpg`;
+              await supabase.storage.from("oferta_media").upload(thumbPath, thumbBlob, {
+                contentType: "image/jpeg",
+                cacheControl: "3600",
+                upsert: true,
+              });
+            }
+          } catch (_e) {
+            // No bloquear la publicación si falla la extracción opcional
+          }
         }
 
         urlPorId[video.id] = buildVideoTrimUrl(

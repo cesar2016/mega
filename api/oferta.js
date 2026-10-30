@@ -94,7 +94,7 @@ module.exports = async function handler(req, res) {
           }
 
           if (fotoPortada?.url || videoPortada?.url) {
-            imagenUrl = `${protocol}://${host}/api/og-image?id=${id}`;
+            imagenUrl = `${protocol}://${host}/api/og-image?id=${id}&v=2`;
           }
         }
       }
