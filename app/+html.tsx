@@ -14,17 +14,20 @@ export default function Root({ children }: PropsWithChildren) {
         {/* Open Graph por defecto para Facebook, WhatsApp, etc. */}
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="Mercado Ganadero" />
-        <meta property="og:title" content="Mercado Ganadero" />
-        <meta property="og:description" content="Plataforma digital para la compra y venta de hacienda en Argentina." />
-        <meta property="og:image" content="https://mercadoganadero.vercel.app/og-banner.png" />
+        <meta property="og:url" content="https://mercadoganadero.app/" />
+        <meta property="og:title" content="Mercado Ganadero · Compra y venta de hacienda" />
+        <meta property="og:description" content="Plataforma digital para la compra y venta de hacienda en Argentina. Publicá tus lotes, conectá con compradores directos y gestioná tus operaciones de forma simple." />
+        <meta property="og:image" content="https://mercadoganadero.app/og-banner.jpg" />
+        <meta property="og:image:secure_url" content="https://mercadoganadero.app/og-banner.jpg" />
+        <meta property="og:image:type" content="image/jpeg" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
 
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Mercado Ganadero" />
+        <meta name="twitter:title" content="Mercado Ganadero · Compra y venta de hacienda" />
         <meta name="twitter:description" content="Plataforma digital para la compra y venta de hacienda en Argentina." />
-        <meta name="twitter:image" content="https://mercadoganadero.vercel.app/og-banner.png" />
+        <meta name="twitter:image" content="https://mercadoganadero.app/og-banner.jpg" />
 
         <ScrollViewStyleReset />
       </head>

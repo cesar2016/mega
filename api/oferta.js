@@ -25,15 +25,16 @@ module.exports = async function handler(req, res) {
   const host =
     req.headers["x-forwarded-host"] ||
     req.headers.host ||
-    "mercadoganadero.vercel.app";
+    "mercadoganadero.app";
   const protocol = req.headers["x-forwarded-proto"] || "https";
   const canonicalUrl = `${protocol}://${host}/oferta/${id || ""}`;
-  const defaultImage = `${protocol}://${host}/og-banner.png`;
+  const defaultImage = `${protocol}://${host}/og-banner.jpg`;
 
-  let titulo = "Mercado Ganadero";
+  let titulo = "Mercado Ganadero · Compra y venta de hacienda";
   let descripcion =
-    "Plataforma digital para la compra y venta de hacienda en Argentina.";
+    "Plataforma digital para la compra y venta de hacienda en Argentina. Publicá tus lotes, conectá con compradores directos y gestioná tus operaciones de forma simple.";
   let imagenUrl = defaultImage;
+  let videoUrl = null;
 
   if (id) {
     try {
@@ -45,15 +46,20 @@ module.exports = async function handler(req, res) {
         process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtrb2N0bXZnbGhqYXlqdGllcGdoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxNzEwNzAsImV4cCI6MjEwNzc0NzA3MH0.qoQWz-5nqAdxnuYe0raj-j_aJoND98nyOmX4h_9KGzg";
 
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+
       const response = await fetch(
-        `${supabaseUrl}/rest/v1/ofertas?id=eq.${id}&select=id,categoria,raza,cantidad,precio,tipo_precio,peso_promedio,localidad,provincia,oferta_media(url,es_portada,tipo)`,
+        `${supabaseUrl}/rest/v1/ofertas?id=eq.${id}&select=id,categoria,raza,cantidad,precio,tipo_precio,peso_promedio,localidad,provincia,oferta_media(url,es_portada,tipo,orden)`,
         {
           headers: {
             apikey: supabaseKey,
             Authorization: `Bearer ${supabaseKey}`,
           },
+          signal: controller.signal,
         }
       );
+      clearTimeout(timeout);
 
       if (response.ok) {
         const data = await response.json();
@@ -67,7 +73,7 @@ module.exports = async function handler(req, res) {
             .join(", ");
           descripcion = [
             oferta.raza || `Lote de ${oferta.categoria}`,
-            `${oferta.cantidad} cabezas`,
+            `${oferta.cantidad || 0} cabezas`,
             precioStr,
             oferta.peso_promedio ? `${oferta.peso_promedio} kg prom.` : null,
             ubicacion || null,
@@ -78,12 +84,16 @@ module.exports = async function handler(req, res) {
           const media = Array.isArray(oferta.oferta_media)
             ? oferta.oferta_media
             : [];
-          const portada =
-            media.find((m) => m.es_portada && m.url) ||
-            media.find((m) => m.tipo === "foto" && m.url) ||
-            media[0];
+          const fotos = media.filter((m) => m.tipo === "foto" && m.url);
+          const videos = media.filter((m) => m.tipo === "video" && m.url);
+          const fotoPortada = fotos.find((m) => m.es_portada) || fotos[0];
+          const videoPortada = videos.find((m) => m.es_portada) || videos[0];
 
-          if (portada?.url) {
+          if (videoPortada?.url) {
+            videoUrl = videoPortada.url.split("#")[0];
+          }
+
+          if (fotoPortada?.url || videoPortada?.url) {
             imagenUrl = `${protocol}://${host}/api/og-image?id=${id}`;
           }
         }
@@ -120,9 +130,21 @@ module.exports = async function handler(req, res) {
     <meta property="og:image" content="${escapeHtml(imagenUrl)}" />
     <meta property="og:image:secure_url" content="${escapeHtml(imagenUrl)}" />
     <meta property="og:image:type" content="image/jpeg" />
-    <meta property="og:image:width" content="800" />
-    <meta property="og:image:height" content="600" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="${escapeHtml(titulo)}" />
+    ${
+      videoUrl
+        ? `
+    <!-- Video Open Graph -->
+    <meta property="og:video" content="${escapeHtml(videoUrl)}" />
+    <meta property="og:video:secure_url" content="${escapeHtml(videoUrl)}" />
+    <meta property="og:video:type" content="video/mp4" />
+    <meta property="og:video:width" content="1280" />
+    <meta property="og:video:height" content="720" />
+    `
+        : ""
+    }
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
@@ -135,6 +157,7 @@ module.exports = async function handler(req, res) {
     let modifiedHtml = html.replace(/<title>.*?<\/title>/gi, "");
     modifiedHtml = modifiedHtml.replace(/<meta property="og:[^>]*>/gi, "");
     modifiedHtml = modifiedHtml.replace(/<meta name="twitter:[^>]*>/gi, "");
+    modifiedHtml = modifiedHtml.replace(/<meta name="description"[^>]*>/gi, "");
     modifiedHtml = modifiedHtml.replace("<head>", `<head>${metaTags}`);
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
