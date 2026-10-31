@@ -3,7 +3,7 @@ import { useGuestRedirect } from "lib/hooks/useAuthRedirect";
 
 export default function AuthLayout() {
   const { returnUrl } = useLocalSearchParams<{ returnUrl?: string }>();
-  const redirect = useGuestRedirect(returnUrl || "/(main)/tabs/feed");
+  const redirect = useGuestRedirect(returnUrl || "/");
   if (redirect) return redirect;
 
   return <Stack screenOptions={{ headerShown: false }} />;

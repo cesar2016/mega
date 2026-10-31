@@ -108,7 +108,7 @@ export default function FeedScreen() {
                 onPress={() =>
                   router.push({
                     pathname: "/auth",
-                    params: { mode: "login", returnUrl: "/(main)/tabs/feed" },
+                    params: { mode: "login", returnUrl: "/" },
                   })
                 }
               />
@@ -175,7 +175,7 @@ export default function FeedScreen() {
                 onPress={() =>
                   router.push({
                     pathname: "/auth",
-                    params: { mode: "registro", returnUrl: "/(main)/tabs/feed" },
+                    params: { mode: "registro", returnUrl: "/" },
                   })
                 }
               />
@@ -186,7 +186,7 @@ export default function FeedScreen() {
                 onPress={() =>
                   router.push({
                     pathname: "/auth",
-                    params: { mode: "login", returnUrl: "/(main)/tabs/feed" },
+                    params: { mode: "login", returnUrl: "/" },
                   })
                 }
               />

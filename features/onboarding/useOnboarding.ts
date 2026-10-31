@@ -61,7 +61,7 @@ export function useOnboarding() {
       }
 
       if (data?.onboarding_completado && data?.email_confirmed_at) {
-        router.replace("/(main)/tabs/feed");
+        router.replace("/");
       } else {
         setStep(1);
       }
@@ -112,7 +112,7 @@ export function useOnboarding() {
       // 3. Navegar a pantalla principal
       setStep(3);
       await new Promise((r) => setTimeout(r, 1500));
-      router.replace("/(main)/tabs/feed");
+      router.replace("/");
     } catch (err: any) {
       console.error("Onboarding error:", err);
       setError(err?.message || "No se pudo completar el onboarding");

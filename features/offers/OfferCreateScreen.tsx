@@ -24,6 +24,7 @@ import { showToast } from "lib/utils";
 import { detectarDatosContacto } from "lib/contactFilter";
 import { extensionForMime, extractVideoThumbnailBlob, toUploadBody } from "lib/upload";
 import { useAuthStore } from "store/authStore";
+import { useAuthRedirect } from "lib/hooks/useAuthRedirect";
 import { Icon } from "components/ui/Icon";
 import { EmptyState } from "components/ui/Avatar";
 import { Badge, Card } from "components/ui/Card";
@@ -88,6 +89,8 @@ const CATEGORIAS = [
 ];
 
 export default function OfferCreateScreen() {
+  const redirect = useAuthRedirect({ returnUrl: "/(main)/oferta-nueva" });
+
   const { id } = useLocalSearchParams<{ id?: string }>();
   const ofertaId = id ? String(id) : "";
   const esEdicion = Boolean(ofertaId);
@@ -499,6 +502,8 @@ export default function OfferCreateScreen() {
     !!values.precio &&
     !!values.tipo_precio &&
     !!values.provincia;
+
+  if (redirect) return redirect;
 
   if (esEdicion && cargandoOferta) {
     return (

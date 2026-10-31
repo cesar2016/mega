@@ -8,6 +8,7 @@ import { useResponsive } from "lib/hooks/useResponsive";
 import { isSupabaseConfigured } from "lib/supabase";
 import { showToast } from "lib/utils";
 import { useAuthStore } from "store/authStore";
+import { useAuthRedirect } from "lib/hooks/useAuthRedirect";
 import { Icon } from "components/ui/Icon";
 import { EmptyState } from "components/ui/Avatar";
 import { Button } from "components/ui/Button";
@@ -61,6 +62,7 @@ function FiltroChip({
  * usuario y las demandas que coinciden con sus lotes.
  */
 export default function MatchesScreen() {
+  const redirect = useAuthRedirect({ returnUrl: "/(main)/tabs/matches" });
   const router = useRouter();
   const queryClient = useQueryClient();
   const profile = useAuthStore((state) => state.profile);
@@ -80,6 +82,8 @@ export default function MatchesScreen() {
     () => (filtro === "todos" ? matches : matches.filter((m) => m.estado === filtro)),
     [filtro, matches],
   );
+
+  if (redirect) return redirect;
 
   const pendientes = matches.filter((m) => m.estado === "pendiente").length;
   const mejorPuntaje = matches.length > 0 ? Math.max(...matches.map((m) => m.puntaje)) : 0;

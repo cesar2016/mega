@@ -3,6 +3,10 @@ import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useAuthStore } from "store/authStore";
+import { usePendientesMatch } from "lib/hooks/useMatches";
+import { useMensajesSinLeer } from "lib/hooks/useChat";
+import { Icon } from "components/ui/Icon";
+import { NAV_ITEMS } from "./navItems";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 
 /**
@@ -36,7 +40,12 @@ export function MobileTabBar({ state, descriptors, navigation }: BottomTabBarPro
             accessibilityRole="button"
             accessibilityState={{ selected: focused }}
             onPress={() => {
-              if (!user && route.name !== "feed") {
+              if (route.name === "feed") {
+                router.push("/");
+                return;
+              }
+
+              if (!user) {
                 router.push({
                   pathname: "/auth",
                   params: { mode: "login", returnUrl: `/(main)/tabs/${route.name}` },
@@ -87,6 +96,96 @@ export function MobileTabBar({ state, descriptors, navigation }: BottomTabBarPro
               ].join(" ")}
             >
               {label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/**
+ * Barra de pestañas inferior autónoma para pantallas que no están dentro de react-navigation tabs (p. ej. la Home /).
+ */
+export function StandaloneMobileTabBar({
+  activeTab = "feed",
+  onFeedPress,
+}: {
+  activeTab?: string;
+  onFeedPress?: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const user = useAuthStore((state) => state.user);
+  const profile = useAuthStore((state) => state.profile);
+  const pendientes = usePendientesMatch({ enabled: !!profile });
+  const mensajesSinLeer = useMensajesSinLeer({ enabled: !!profile });
+
+  return (
+    <View
+      className="flex-row items-stretch border-t border-line-soft bg-surface px-2 pt-1.5 md:hidden"
+      style={{ paddingBottom: Math.max(insets.bottom, 8) }}
+    >
+      {NAV_ITEMS.map((item) => {
+        const focused = item.name === activeTab;
+        const badge =
+          item.name === "matches" && pendientes > 0
+            ? pendientes
+            : item.name === "chat" && mensajesSinLeer > 0
+              ? mensajesSinLeer > 99
+                ? "99+"
+                : mensajesSinLeer
+              : undefined;
+
+        return (
+          <Pressable
+            key={item.name}
+            accessibilityRole="button"
+            accessibilityState={{ selected: focused }}
+            onPress={() => {
+              if (item.name === "feed") {
+                if (onFeedPress) onFeedPress();
+                else router.push("/");
+                return;
+              }
+
+              if (!user) {
+                router.push({
+                  pathname: "/auth",
+                  params: { mode: "login", returnUrl: item.href as string },
+                });
+                return;
+              }
+
+              router.push(item.href);
+            }}
+            className="flex-1 items-center gap-1 rounded-2xl py-1.5"
+          >
+            <View
+              className={[
+                "h-8 w-12 items-center justify-center rounded-xl",
+                focused ? "bg-sage-50" : "",
+              ].join(" ")}
+            >
+              <Icon
+                name={item.icon}
+                color={focused ? "#4C6B54" : "#8C978E"}
+                size={20}
+              />
+              {badge != null && badge !== "" ? (
+                <View className="absolute -right-1 -top-1 min-w-[18px] items-center justify-center rounded-full bg-clay-500 px-1">
+                  <Text className="text-[10px] font-bold leading-4 text-white">{badge}</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text
+              numberOfLines={1}
+              className={[
+                "text-[10px]",
+                focused ? "font-bold text-sage-700" : "font-medium text-ink-muted",
+              ].join(" ")}
+            >
+              {item.title}
             </Text>
           </Pressable>
         );

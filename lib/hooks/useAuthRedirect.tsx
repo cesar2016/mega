@@ -7,20 +7,30 @@ import { useAuthStore } from "store/authStore";
  * Redirige a /auth cuando hay sesión real pero el usuario no está autenticado.
  * En modo demo (sin Supabase configurado) no redirige: hay un perfil sintético.
  */
-export function useAuthRedirect(options?: { enabled?: boolean }): React.ReactElement | null {
+export function useAuthRedirect(options?: { enabled?: boolean; returnUrl?: string }): React.ReactElement | null {
   const enabled = options?.enabled ?? true;
   const user = useAuthStore((state) => state.user);
   const loading = useAuthStore((state) => state.loading);
 
   if (!enabled || loading) return null;
-  if (isSupabaseConfigured && !user) return <Redirect href="/auth" />;
+  if (isSupabaseConfigured && !user) {
+    return (
+      <Redirect
+        href={
+          options?.returnUrl
+            ? ({ pathname: "/auth", params: { returnUrl: options.returnUrl } } as any)
+            : "/auth"
+        }
+      />
+    );
+  }
   return null;
 }
 
 /**
  * Para la pantalla de auth: si ya hay sesión, va directo a la app (o a returnUrl).
  */
-export function useGuestRedirect(defaultHref: string = "/(main)/tabs/feed"): React.ReactElement | null {
+export function useGuestRedirect(defaultHref: string = "/"): React.ReactElement | null {
   const user = useAuthStore((state) => state.user);
   const loading = useAuthStore((state) => state.loading);
 
@@ -40,6 +50,6 @@ export function useOnboardingRedirect(): React.ReactElement | null {
 
   if (loading) return null;
   if (isSupabaseConfigured && !user) return <Redirect href="/auth" />;
-  if (profile?.onboarding_completado === true) return <Redirect href="/(main)/tabs/feed" />;
+  if (profile?.onboarding_completado === true) return <Redirect href="/" />;
   return null;
 }

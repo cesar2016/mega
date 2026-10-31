@@ -36,7 +36,7 @@ export function MobileTopBar({
         </Pressable>
       ) : (
         <Pressable
-          onPress={() => router.push("/(main)/tabs/feed")}
+          onPress={() => router.push("/")}
           className="h-9 w-9 items-center justify-center rounded-full active:opacity-80"
           accessibilityRole="button"
           accessibilityLabel="Ir al inicio"

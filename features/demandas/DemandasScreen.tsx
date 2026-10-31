@@ -5,6 +5,7 @@ import { useDemandasActivas } from "lib/hooks/useDemandaDB";
 import { useResponsive } from "lib/hooks/useResponsive";
 import { isSupabaseConfigured } from "lib/supabase";
 import { useAuthStore } from "store/authStore";
+import { useAuthRedirect } from "lib/hooks/useAuthRedirect";
 import { maskNombreUsuario, showToast } from "lib/utils";
 import { Icon } from "components/ui/Icon";
 import { Avatar, EmptyState } from "components/ui/Avatar";
@@ -51,6 +52,7 @@ function rangoCantidad(demanda: Demanda) {
  * Demandas de compra (comprador). Muestra las búsquedas activas del mercado.
  */
 export default function DemandasScreen() {
+  const redirect = useAuthRedirect({ returnUrl: "/(main)/tabs/demandas" });
   const router = useRouter();
   const profile = useAuthStore((state) => state.profile);
   const { width } = useResponsive();
@@ -59,6 +61,8 @@ export default function DemandasScreen() {
   const { data, isLoading, error, refetch, isRefetching } = useDemandasActivas({
     enabled: !!profile,
   });
+
+  if (redirect) return redirect;
 
   const contactarDemanda = (item: Demanda) => {
     const esPropia = Boolean(

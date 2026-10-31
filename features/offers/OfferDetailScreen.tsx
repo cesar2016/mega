@@ -169,7 +169,7 @@ export default function OfferDetailScreen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace(user ? "/(main)/tabs/feed" : "/auth");
+      router.replace("/");
     }
   };
 

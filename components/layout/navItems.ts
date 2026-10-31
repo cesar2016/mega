@@ -11,7 +11,7 @@ export type NavItem = {
 
 /** Navegación principal: se usa en el sidebar (web) y en la barra inferior (mobile). */
 export const NAV_ITEMS: NavItem[] = [
-  { name: "feed", href: "/(main)/tabs/feed", title: "Ofertas", icon: "store" },
+  { name: "feed", href: "/", title: "Ofertas", icon: "store" },
   { name: "matches", href: "/(main)/tabs/matches", title: "Matches", icon: "sparkles" },
   { name: "ofertas", href: "/(main)/tabs/ofertas", title: "Mis ofertas", icon: "boxes" },
   { name: "demandas", href: "/(main)/tabs/demandas", title: "Demandas", icon: "search" },
@@ -21,5 +21,8 @@ export const NAV_ITEMS: NavItem[] = [
 
 /** Devuelve el item activo según la ruta actual de la web. */
 export function activeNavItem(pathname: string): NavItem | undefined {
+  if (pathname === "/" || pathname === "" || pathname.endsWith("/feed") || pathname.includes("/tabs/feed")) {
+    return NAV_ITEMS[0];
+  }
   return NAV_ITEMS.find((item) => pathname.endsWith(`/tabs/${item.name}`));
 }

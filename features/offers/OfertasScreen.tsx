@@ -6,6 +6,7 @@ import { deleteOferta, useOfertasPorProductor } from "lib/hooks/useOfferDB";
 import { useResponsive } from "lib/hooks/useResponsive";
 import { showToast } from "lib/utils";
 import { useAuthStore } from "store/authStore";
+import { useAuthRedirect } from "lib/hooks/useAuthRedirect";
 import { Icon } from "components/ui/Icon";
 import { EmptyState } from "components/ui/Avatar";
 import { Card } from "components/ui/Card";
@@ -21,6 +22,7 @@ import type { OfertaResumen } from "features/offers/OfferCard";
  * y permite editarlas o eliminarlas directamente.
  */
 export default function OfertasScreen() {
+  const redirect = useAuthRedirect({ returnUrl: "/(main)/tabs/ofertas" });
   const router = useRouter();
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
@@ -29,6 +31,8 @@ export default function OfertasScreen() {
   const columns = width >= 1280 ? 3 : width >= 768 ? 2 : 1;
 
   const { data, isLoading, error, refetch, isRefetching } = useOfertasPorProductor(user?.id ?? "");
+
+  if (redirect) return redirect;
 
   const irAPublicar = () => router.push("/(main)/oferta-nueva");
   const irAlDetalle = (id: string) => router.push(`/(main)/oferta/${id}`);

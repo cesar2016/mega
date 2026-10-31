@@ -1,7 +1,6 @@
-import { Redirect, Slot, Stack, usePathname, useSegments } from "expo-router";
+import { Redirect, Slot, Stack } from "expo-router";
 import { View } from "react-native";
 import { isSupabaseConfigured } from "lib/supabase";
-import { useAuthRedirect } from "lib/hooks/useAuthRedirect";
 import { useResponsive } from "lib/hooks/useResponsive";
 import { useAuthStore } from "store/authStore";
 import { AppSidebar } from "components/layout/AppSidebar";
@@ -11,22 +10,6 @@ export default function MainLayout() {
   const profile = useAuthStore((state) => state.profile);
   const loading = useAuthStore((state) => state.loading);
   const { isWide } = useResponsive();
-  const pathname = usePathname();
-  const segments = useSegments();
-
-  // La home/galería de ofertas (/tabs/feed) y las publicaciones (/oferta/:id) son públicas:
-  // los visitantes sin sesión deben poder explorar el mercado libremente.
-  const isPublicRoute =
-    pathname === "/" ||
-    pathname === "" ||
-    pathname?.startsWith("/oferta/") ||
-    pathname?.endsWith("/tabs/feed") ||
-    pathname === "/tabs/feed" ||
-    (segments as string[])?.includes("oferta") ||
-    (segments as string[])?.includes("feed");
-
-  const redirect = useAuthRedirect({ enabled: !isPublicRoute });
-  if (redirect) return redirect;
 
   if (loading) return null;
 

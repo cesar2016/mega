@@ -23,6 +23,7 @@ import { useResponsive } from "lib/hooks/useResponsive";
 import { isSupabaseConfigured } from "lib/supabase";
 import { showToast } from "lib/utils";
 import { useAuthStore } from "store/authStore";
+import { useAuthRedirect } from "lib/hooks/useAuthRedirect";
 import { Icon } from "components/ui/Icon";
 import { Avatar, EmptyState } from "components/ui/Avatar";
 import { Badge, Card } from "components/ui/Card";
@@ -77,6 +78,8 @@ function resumenContexto(
 }
 
 export default function ChatScreen() {
+  const redirect = useAuthRedirect({ returnUrl: "/(main)/tabs/chat" });
+
   const {
     id: paramConvId,
     ofertaId: paramOfertaId,
@@ -228,6 +231,8 @@ export default function ChatScreen() {
     [texto]
   );
 
+  if (redirect) return redirect;
+
   const handleEnviar = async (mensajeExplicito?: string) => {
     const cuerpo = (mensajeExplicito ?? texto).trim();
     if (!cuerpo || !user?.id || !contextoActivo) return;
@@ -371,7 +376,7 @@ export default function ChatScreen() {
               <Button
                 label="Explorar publicaciones"
                 icon="store"
-                onPress={() => router.push("/(main)/tabs/feed")}
+                onPress={() => router.push("/")}
               />
             }
           />

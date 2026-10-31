@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "store/authStore";
+import { useAuthRedirect } from "lib/hooks/useAuthRedirect";
 import { maskNombreUsuario, showToast } from "lib/utils";
 import { Icon } from "components/ui/Icon";
 import { Avatar } from "components/ui/Avatar";
@@ -53,6 +54,7 @@ function Dato({
 }
 
 export default function PerfilScreen() {
+  const redirect = useAuthRedirect({ returnUrl: "/(main)/tabs/perfil" });
   const router = useRouter();
   const queryClient = useQueryClient();
   const { profile, user, updateProfile, signOut } = useAuthStore();
@@ -64,13 +66,15 @@ export default function PerfilScreen() {
   const [saving, setSaving] = React.useState(false);
   const [cerrandoSesion, setCerrandoSesion] = React.useState(false);
 
+  if (redirect) return redirect;
+
   const handleCerrarSesion = async () => {
     try {
       setCerrandoSesion(true);
       await signOut();
       queryClient.clear();
       showToast("Sesión cerrada correctamente", "info");
-      router.replace("/(main)/tabs/feed");
+      router.replace("/");
     } catch (err) {
       console.error("Error al cerrar sesión:", err);
       showToast("Error al cerrar sesión", "error");
@@ -100,7 +104,7 @@ export default function PerfilScreen() {
   if (!user || !profile) {
     return (
       <View className="flex-1 bg-canvas">
-        <MobileTopBar title="Perfil" />
+        <MobileTopBar title="Perfil" onBack={() => router.replace("/")} />
         <Screen
           eyebrow="Tu cuenta"
           title="Perfil"
@@ -124,7 +128,7 @@ export default function PerfilScreen() {
                 label="Ir a la home"
                 variant="secondary"
                 icon="arrowLeft"
-                onPress={() => router.replace("/(main)/tabs/feed")}
+                onPress={() => router.replace("/")}
               />
             </View>
           </Card>

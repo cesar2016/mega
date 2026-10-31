@@ -36,13 +36,18 @@ export function AppSidebar() {
   return (
     <View className="h-full w-[264px] shrink-0 border-r border-line-soft bg-surface px-4 py-6">
       {/* Marca */}
-      <View className="mb-8 flex-row items-center gap-3 px-2">
+      <Pressable
+        onPress={() => router.push("/")}
+        accessibilityRole="button"
+        accessibilityLabel="Ir al inicio"
+        className="mb-8 flex-row items-center gap-3 px-2 cursor-pointer"
+      >
         <Logo size={44} className="rounded-full shadow-sm" />
         <View className="flex-1">
           <Text className="text-[15px] font-bold leading-5 text-ink">Mercado Ganadero</Text>
           <Text className="text-[11px] leading-4 text-ink-muted">Compra y venta de hacienda</Text>
         </View>
-      </View>
+      </Pressable>
 
       {/* Navegación */}
       <View className="gap-1">
@@ -146,7 +151,7 @@ export function AppSidebar() {
               await signOut();
               queryClient.clear();
               showToast("Sesión cerrada correctamente", "info");
-              router.replace("/(main)/tabs/feed");
+              router.replace("/");
             }}
             accessibilityRole="button"
             accessibilityLabel="Cerrar sesión"
