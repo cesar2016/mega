@@ -172,7 +172,7 @@ export function StandaloneMobileTabBar({
                 color={focused ? "#4C6B54" : "#8C978E"}
                 size={20}
               />
-              {badge != null && badge !== "" ? (
+              {badge != null ? (
                 <View className="absolute -right-1 -top-1 min-w-[18px] items-center justify-center rounded-full bg-clay-500 px-1">
                   <Text className="text-[10px] font-bold leading-4 text-white">{badge}</Text>
                 </View>

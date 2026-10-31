@@ -8,6 +8,7 @@ import { Button } from "components/ui/Button";
 import { MediaCover } from "components/ui/MediaCover";
 import { fotosDe, portadaDe, videosDe } from "components/ui/OfertaMedia";
 import type { OfertaMediaRow } from "components/ui/OfertaMedia";
+import { ShareOfferModal } from "./ShareOfferModal";
 
 export type OfertaResumen = {
   id: string;
@@ -66,6 +67,7 @@ export function OfferCard({
   const [confirmando, setConfirmando] = useState(false);
   const [eliminando, setEliminando] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [shareModalVisible, setShareModalVisible] = useState(false);
 
   const portada = portadaDe(oferta.oferta_media);
   const fotos = fotosDe(oferta.oferta_media).length;
@@ -97,16 +99,16 @@ export function OfferCard({
         ].join(" ")}
         padded={false}
       >
-        <Pressable
-          onPress={onPress}
-          onHoverIn={() => setHovered(true)}
-          onHoverOut={() => setHovered(false)}
-          accessibilityRole="button"
-          accessibilityLabel={`Ver publicación de ${oferta.categoria}`}
-          className="w-full active:opacity-90"
-        >
-          {/* Portada */}
-          <View className="relative">
+        {/* Portada */}
+        <View className="relative">
+          <Pressable
+            onPress={onPress}
+            onHoverIn={() => setHovered(true)}
+            onHoverOut={() => setHovered(false)}
+            accessibilityRole="button"
+            accessibilityLabel={`Ver publicación de ${oferta.categoria}`}
+            className="w-full active:opacity-90"
+          >
             <MediaCover
               url={portada?.url}
               media={oferta.oferta_media}
@@ -115,33 +117,56 @@ export function OfferCard({
               className="h-40"
               rounded="rounded-none"
             />
+          </Pressable>
 
-            {fotos > 1 || videos > 0 ? (
-              <View
-                pointerEvents="none"
-                className="absolute bottom-2 right-2 flex-row items-center gap-1 rounded-lg bg-ink/65 px-2 py-1"
-              >
-                <Icon
-                  name={videos > 0 ? "video" : "image"}
-                  size={12}
-                  className="text-white"
-                />
-                <Text className="text-[10px] font-semibold text-white">
-                  {hovered && videos > 0 ? "Reproduciendo video" : resumenMedia}
-                </Text>
-              </View>
-            ) : null}
+          {fotos > 1 || videos > 0 ? (
+            <View
+              pointerEvents="none"
+              className="absolute bottom-2 right-2 flex-row items-center gap-1 rounded-lg bg-ink/65 px-2 py-1"
+            >
+              <Icon
+                name={videos > 0 ? "video" : "image"}
+                size={12}
+                className="text-white"
+              />
+              <Text className="text-[10px] font-semibold text-white">
+                {hovered && videos > 0 ? "Reproduciendo video" : resumenMedia}
+              </Text>
+            </View>
+          ) : null}
 
-            {oferta.estado && oferta.estado !== "activa" ? (
-              <View className="absolute left-2 top-2 rounded-lg bg-ink/70 px-2 py-1">
-                <Text className="text-[10px] font-semibold uppercase text-white">
-                  {oferta.estado}
-                </Text>
-              </View>
-            ) : null}
-          </View>
+          {oferta.estado && oferta.estado !== "activa" ? (
+            <View className="absolute left-2 top-2 rounded-lg bg-ink/70 px-2 py-1">
+              <Text className="text-[10px] font-semibold uppercase text-white">
+                {oferta.estado}
+              </Text>
+            </View>
+          ) : null}
 
-          {/* Contenido */}
+          {/* Botón compartir en portada */}
+          <Pressable
+            onPress={(e) => {
+              (e as any)?.stopPropagation?.();
+              setShareModalVisible(true);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Compartir publicación"
+            className="absolute right-2 top-2 z-10 flex-row items-center gap-1.5 rounded-lg bg-ink/70 hover:bg-ink/90 active:bg-ink px-2.5 py-1.5 backdrop-blur-sm shadow-sm"
+          >
+            <Icon name="share" size={13} className="text-white" />
+            <Text className="text-xs font-semibold text-white">Compartir</Text>
+          </Pressable>
+        </View>
+
+        {/* Contenido */}
+        <Pressable
+          onPress={onPress}
+          onHoverIn={() => setHovered(true)}
+          onHoverOut={() => setHovered(false)}
+          accessibilityRole="button"
+          accessibilityLabel={`Ver publicación de ${oferta.categoria}`}
+          className="w-full active:opacity-90"
+        >
           <View className="gap-4 p-5">
             <View className="flex-row items-start justify-between gap-3">
               <View className="min-w-0 flex-1 gap-2">
@@ -240,6 +265,14 @@ export function OfferCard({
               </View>
             ) : (
               <View className="flex-row items-center justify-end gap-2">
+                <Button
+                  label="Compartir"
+                  icon="share"
+                  variant="secondary"
+                  size="sm"
+                  onPress={() => setShareModalVisible(true)}
+                  className="flex-1"
+                />
                 {onEdit ? (
                   <Button
                     label="Editar"
@@ -265,6 +298,13 @@ export function OfferCard({
           </View>
         ) : null}
       </Card>
+
+      <ShareOfferModal
+        visible={shareModalVisible}
+        onClose={() => setShareModalVisible(false)}
+        oferta={oferta}
+        portadaUrl={portada?.url}
+      />
     </View>
   );
 }
