@@ -91,7 +91,7 @@ export default function FeedScreen() {
   return (
     <View className="flex-1 bg-canvas">
       {!user ? (
-        <View className="flex-row items-center border-b border-line-soft bg-surface/90 px-4 py-3 md:px-8">
+        <View className="flex-row items-center justify-between border-b border-line-soft bg-surface/90 px-4 py-3 md:px-8">
           <Pressable
             onPress={() => router.push("/")}
             className="flex-row items-center gap-3 active:opacity-80 cursor-pointer"
@@ -104,6 +104,31 @@ export default function FeedScreen() {
               <Text className="text-xs text-ink-muted">Compra y venta de hacienda</Text>
             </View>
           </Pressable>
+
+          <View className="flex-row items-center gap-2">
+            <Button
+              label="Registrarme gratis"
+              icon="userPlus"
+              size="sm"
+              onPress={() =>
+                router.push({
+                  pathname: "/auth",
+                  params: { mode: "registro", returnUrl: "/" },
+                })
+              }
+            />
+            <Button
+              label="Iniciar sesión"
+              variant="secondary"
+              size="sm"
+              onPress={() =>
+                router.push({
+                  pathname: "/auth",
+                  params: { mode: "login", returnUrl: "/" },
+                })
+              }
+            />
+          </View>
         </View>
       ) : (
         <MobileTopBar title="Ofertas" action onActionPress={irAPublicar} />
@@ -159,43 +184,17 @@ export default function FeedScreen() {
         </Gradient>
 
         {!user ? (
-          <View className="flex-col gap-3 rounded-3xl border border-sage-200 bg-sage-50/90 p-4 md:flex-row md:items-center md:justify-between md:px-6 md:py-4">
-            <View className="flex-row items-center gap-3">
-              <View className="h-10 w-10 items-center justify-center rounded-2xl bg-sage-100">
-                <Icon name="handshake" size={20} className="text-sage-700" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-sm font-bold text-ink">
-                  ¿Querés comprar, vender o transportar hacienda?
-                </Text>
-                <Text className="text-xs text-ink-muted">
-                  Registrate gratis para consultar por lotes, publicar hacienda y pedir cotizaciones de flete.
-                </Text>
-              </View>
+          <View className="flex-row items-center gap-3 rounded-3xl border border-sage-200 bg-sage-50/90 p-4 md:px-6 md:py-4">
+            <View className="h-10 w-10 items-center justify-center rounded-2xl bg-sage-100">
+              <Icon name="handshake" size={20} className="text-sage-700" />
             </View>
-            <View className="flex-row items-center gap-2">
-              <Button
-                label="Registrarme gratis"
-                icon="userPlus"
-                size="sm"
-                onPress={() =>
-                  router.push({
-                    pathname: "/auth",
-                    params: { mode: "registro", returnUrl: "/" },
-                  })
-                }
-              />
-              <Button
-                label="Iniciar sesión"
-                variant="secondary"
-                size="sm"
-                onPress={() =>
-                  router.push({
-                    pathname: "/auth",
-                    params: { mode: "login", returnUrl: "/" },
-                  })
-                }
-              />
+            <View className="flex-1">
+              <Text className="text-sm font-bold text-ink">
+                ¿Querés comprar, vender o transportar hacienda?
+              </Text>
+              <Text className="text-xs text-ink-muted">
+                Registrate gratis para consultar por lotes, publicar hacienda y pedir cotizaciones de flete.
+              </Text>
             </View>
           </View>
         ) : null}
