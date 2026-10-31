@@ -1,5 +1,4 @@
-import React from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { deleteOferta, useOfertasActivas } from "lib/hooks/useOfferDB";
@@ -8,10 +7,11 @@ import { useResponsive } from "lib/hooks/useResponsive";
 import { showToast } from "lib/utils";
 import { useAuthStore } from "store/authStore";
 import { Icon } from "components/ui/Icon";
-import { EmptyState } from "components/ui/Avatar";
+import { Avatar, EmptyState } from "components/ui/Avatar";
 import { Button } from "components/ui/Button";
 import { Grid } from "components/ui/Grid";
 import { Gradient, Screen } from "components/ui/Screen";
+import { Logo } from "components/ui/Logo";
 import { MobileTopBar } from "components/layout/MobileTopBar";
 import { OfferCard } from "features/offers/OfferCard";
 import type { OfertaResumen } from "features/offers/OfferCard";
@@ -90,7 +90,24 @@ export default function FeedScreen() {
 
   return (
     <View className="flex-1 bg-canvas">
-      <MobileTopBar title="Ofertas" action onActionPress={irAPublicar} />
+      {!user ? (
+        <View className="flex-row items-center border-b border-line-soft bg-surface/90 px-4 py-3 md:px-8">
+          <Pressable
+            onPress={() => router.push("/")}
+            className="flex-row items-center gap-3 active:opacity-80 cursor-pointer"
+            accessibilityRole="button"
+            accessibilityLabel="Ir al inicio"
+          >
+            <Logo size={40} className="rounded-full shadow-sm" />
+            <View>
+              <Text className="text-base font-bold text-ink">Mercado Ganadero</Text>
+              <Text className="text-xs text-ink-muted">Compra y venta de hacienda</Text>
+            </View>
+          </Pressable>
+        </View>
+      ) : (
+        <MobileTopBar title="Ofertas" action onActionPress={irAPublicar} />
+      )}
 
       <Screen
         eyebrow="Mercado Ganadero"
@@ -99,26 +116,15 @@ export default function FeedScreen() {
         onRefresh={() => refetch()}
         refreshing={isRefetching}
         action={
-          <View className="hidden flex-row items-center gap-2 md:flex">
-            {!user ? (
+          user ? (
+            <View className="hidden flex-row items-center gap-2 md:flex">
               <Button
-                label="Iniciar sesión"
-                variant="secondary"
-                icon="logIn"
-                onPress={() =>
-                  router.push({
-                    pathname: "/auth",
-                    params: { mode: "login", returnUrl: "/" },
-                  })
-                }
+                label="Publicar oferta"
+                icon="plus"
+                onPress={irAPublicar}
               />
-            ) : null}
-            <Button
-              label="Publicar oferta"
-              icon="plus"
-              onPress={irAPublicar}
-            />
-          </View>
+            </View>
+          ) : undefined
         }
       >
         <Gradient
