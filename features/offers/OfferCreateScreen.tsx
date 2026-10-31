@@ -572,9 +572,10 @@ export default function OfferCreateScreen() {
         className="flex-1"
         contentContainerStyle={{ flexGrow: 1 }}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={Platform.OS === "web"}
       >
         <Screen
+          scroll={false}
           eyebrow={esEdicion ? "Editar lote" : "Nuevo lote"}
           title={esEdicion ? "Actualizar publicación" : "Publicar oferta"}
           subtitle={

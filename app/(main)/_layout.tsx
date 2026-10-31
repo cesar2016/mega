@@ -33,7 +33,7 @@ export default function MainLayout() {
     return (
       <View className="flex-1 flex-row bg-canvas">
         <AppSidebar />
-        <View className="flex-1">
+        <View className="flex-1 min-w-0">
           <Slot />
         </View>
       </View>

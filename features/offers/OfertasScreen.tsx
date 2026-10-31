@@ -28,7 +28,7 @@ export default function OfertasScreen() {
   const user = useAuthStore((state) => state.user);
   const { width } = useResponsive();
 
-  const columns = width >= 1280 ? 3 : width >= 768 ? 2 : 1;
+  const columns = width >= 1280 ? 3 : width >= 640 ? 2 : 1;
 
   const { data, isLoading, error, refetch, isRefetching } = useOfertasPorProductor(user?.id ?? "");
 

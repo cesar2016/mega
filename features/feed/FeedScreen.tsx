@@ -23,7 +23,7 @@ export default function FeedScreen() {
   const profile = useAuthStore((state) => state.profile);
   const { width } = useResponsive();
 
-  const columns = width >= 1280 ? 3 : width >= 768 ? 2 : 1;
+  const columns = width >= 1280 ? 3 : width >= 640 ? 2 : 1;
 
   // El marketplace y galería de publicaciones es público y visible para todos los visitantes
   const { data: ofertas, isLoading, error, refetch, isRefetching } = useOfertasActivas();
@@ -91,24 +91,26 @@ export default function FeedScreen() {
   return (
     <View className="flex-1 bg-canvas">
       {!user ? (
-        <View className="flex-row items-center justify-between border-b border-line-soft bg-surface/90 px-4 py-3 md:px-8">
+        <View className="flex-row items-center justify-between border-b border-line-soft bg-surface/90 px-3 py-2.5 sm:px-4 sm:py-3 md:px-8">
           <Pressable
             onPress={() => router.push("/")}
-            className="flex-row items-center gap-3 active:opacity-80 cursor-pointer"
+            className="flex-row items-center gap-2 sm:gap-3 active:opacity-80 cursor-pointer"
             accessibilityRole="button"
             accessibilityLabel="Ir al inicio"
           >
-            <Logo size={40} className="rounded-full shadow-sm" />
+            <Logo size={width < 400 ? 34 : 40} className="rounded-full shadow-sm" />
             <View>
-              <Text className="text-base font-bold text-ink">Mercado Ganadero</Text>
-              <Text className="text-xs text-ink-muted">Compra y venta de hacienda</Text>
+              <Text className="text-sm sm:text-base font-bold text-ink">Mercado Ganadero</Text>
+              {width >= 640 ? (
+                <Text className="text-xs text-ink-muted">Compra y venta de hacienda</Text>
+              ) : null}
             </View>
           </Pressable>
 
-          <View className="flex-row items-center gap-2">
+          <View className="flex-row items-center gap-1.5 sm:gap-2">
             <Button
-              label="Registrarme gratis"
-              icon="userPlus"
+              label={width < 500 ? "Registro" : "Registrarme gratis"}
+              icon={width < 400 ? undefined : "userPlus"}
               size="sm"
               onPress={() =>
                 router.push({
@@ -118,7 +120,7 @@ export default function FeedScreen() {
               }
             />
             <Button
-              label="Iniciar sesión"
+              label={width < 500 ? "Entrar" : "Iniciar sesión"}
               variant="secondary"
               size="sm"
               onPress={() =>

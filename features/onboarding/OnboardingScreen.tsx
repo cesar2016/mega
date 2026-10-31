@@ -1,5 +1,5 @@
 import React from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useOnboarding } from "./useOnboarding";
 import { Icon } from "components/ui/Icon";
 import type { IconName } from "components/ui/Icon.types";
@@ -48,7 +48,7 @@ export default function OnboardingScreen() {
       className="flex-1 bg-canvas"
       contentContainerStyle={{ flexGrow: 1 }}
       keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
+      showsVerticalScrollIndicator={Platform.OS === "web"}
     >
       <View className="flex-1 items-center justify-center px-4 py-8 md:px-8 md:py-12">
         <View className="w-full max-w-2xl gap-7">

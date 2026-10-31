@@ -5,6 +5,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   Share,
   Text,
   View,
@@ -211,7 +212,7 @@ export function ShareOfferModal({
           accessibilityLabel="Cerrar modal"
         />
 
-        <View className="w-full max-w-md overflow-hidden rounded-3xl border border-line bg-surface shadow-lift">
+        <View className="w-full max-w-md max-h-[90vh] overflow-hidden rounded-3xl border border-line bg-surface shadow-lift">
           {/* Header */}
           <View className="flex-row items-center justify-between border-b border-line-soft px-5 py-4">
             <View className="flex-row items-center gap-3">
@@ -234,7 +235,10 @@ export function ShareOfferModal({
             </Pressable>
           </View>
 
-          <View className="gap-4 p-5">
+          <ScrollView
+            showsVerticalScrollIndicator={Platform.OS === "web"}
+            contentContainerStyle={{ padding: 20, gap: 16 }}
+          >
             {/* Tarjeta resumen del lote con miniatura */}
             <View className="flex-row items-center gap-3 rounded-2xl border border-line-soft bg-surface-soft p-3">
               <View className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-line-soft bg-surface-sunk">
@@ -404,7 +408,7 @@ export function ShareOfferModal({
                 </Pressable>
               </View>
             </View>
-          </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>

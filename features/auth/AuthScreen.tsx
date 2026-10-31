@@ -192,7 +192,7 @@ export default function AuthScreen() {
       <ScrollView
         contentContainerStyle={{ flexGrow: 1 }}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={Platform.OS === "web"}
       >
         <View className="flex-1 flex-col lg:flex-row">
           {/* Panel de marca (escritorio) */}

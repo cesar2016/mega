@@ -32,22 +32,34 @@ textarea:focus-visible {
   box-shadow: none !important;
 }
 
-/* Scrollbar discreto en escritorio. */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
+/* Scrollbar visible y elegante en versión PC / escritorio */
+@media (min-width: 768px) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #8C978E #f3f1ec;
+  }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
 
-::-webkit-scrollbar-thumb {
-  background-color: theme("colors.line");
-  border-radius: 9999px;
-  border: 3px solid theme("colors.canvas");
-}
+  ::-webkit-scrollbar-track {
+    background: #f3f1ec;
+    border-left: 1px solid #E3DFD6;
+  }
 
-::-webkit-scrollbar-thumb:hover {
-  background-color: theme("colors.ink.muted");
+  ::-webkit-scrollbar-thumb {
+    background-color: #8C978E;
+    border-radius: 9999px;
+    border: 3px solid #f3f1ec;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: #4C6B54;
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background-color: #38513E;
+  }
 }
