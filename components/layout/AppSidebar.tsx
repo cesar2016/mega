@@ -55,8 +55,16 @@ export function AppSidebar() {
             <Pressable
               key={item.name}
               accessibilityRole="button"
-              accessibilityState={{ selected: focused }}
-              onPress={() => router.push(item.href)}
+              onPress={() => {
+                if (!profile && item.name !== "feed") {
+                  router.push({
+                    pathname: "/auth",
+                    params: { mode: "login", returnUrl: item.href as string },
+                  });
+                  return;
+                }
+                router.push(item.href);
+              }}
               className={[
                 "flex-row items-center gap-3 rounded-2xl px-3 py-2.5",
                 focused ? "bg-sage-50" : "active:bg-surface-sunk",

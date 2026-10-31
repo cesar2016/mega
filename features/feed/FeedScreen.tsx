@@ -19,18 +19,25 @@ import type { OfertaResumen } from "features/offers/OfferCard";
 export default function FeedScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const user = useAuthStore((state) => state.user);
   const profile = useAuthStore((state) => state.profile);
   const { width } = useResponsive();
 
   const columns = width >= 1280 ? 3 : width >= 768 ? 2 : 1;
 
-  // El marketplace es visible para todos los roles (el fletero también puede
-  // ver lotes para ofertar flete).
-  const { data: ofertas, isLoading, error, refetch, isRefetching } = useOfertasActivas({
-    enabled: !!profile,
-  });
+  // El marketplace y galería de publicaciones es público y visible para todos los visitantes
+  const { data: ofertas, isLoading, error, refetch, isRefetching } = useOfertasActivas();
 
-  const irAPublicar = () => router.push("/(main)/oferta-nueva");
+  const irAPublicar = () => {
+    if (!user) {
+      router.push({
+        pathname: "/auth",
+        params: { mode: "registro", returnUrl: "/(main)/oferta-nueva" },
+      });
+      return;
+    }
+    router.push("/(main)/oferta-nueva");
+  };
   const irAlDetalle = (id: string) => router.push(`/(main)/oferta/${id}`);
   const irAEditar = (id: string) =>
     router.push({ pathname: "/(main)/oferta-nueva", params: { id } });
@@ -51,15 +58,6 @@ export default function FeedScreen() {
       showToast(err?.message || "No se pudo eliminar la publicación", "error");
     }
   };
-
-  if (!profile) {
-    return (
-      <View className="flex-1 items-center justify-center gap-3 bg-canvas">
-        <ActivityIndicator size="large" className="text-sage-500" />
-        <Text className="text-sm text-ink-muted">Cargando perfil...</Text>
-      </View>
-    );
-  }
 
   if (isLoading) {
     return (
@@ -83,20 +81,44 @@ export default function FeedScreen() {
     );
   }
 
-  const lista = (ofertas ?? []) as OfertaResumen[];
+  // Galería de publicaciones ordenada de mayor a menor por fecha (más reciente primero)
+  const lista = ((ofertas ?? []) as OfertaResumen[]).slice().sort((a, b) => {
+    const fechaA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const fechaB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return fechaB - fechaA;
+  });
 
   return (
     <View className="flex-1 bg-canvas">
       <MobileTopBar title="Ofertas" action onActionPress={irAPublicar} />
 
       <Screen
-        eyebrow="Mercado ganadero"
+        eyebrow="Mercado Ganadero"
         title="Lotes disponibles"
-        subtitle="Ofertas activas de productores verificados en todo el país. Conectá directo y cerrá el trato."
+        subtitle="Galería de publicaciones activas en tiempo real. Conectá directo con productores y transportistas."
         onRefresh={() => refetch()}
         refreshing={isRefetching}
         action={
-          <Button label="Publicar oferta" icon="plus" onPress={irAPublicar} className="hidden md:flex" />
+          <View className="hidden flex-row items-center gap-2 md:flex">
+            {!user ? (
+              <Button
+                label="Iniciar sesión"
+                variant="secondary"
+                icon="logIn"
+                onPress={() =>
+                  router.push({
+                    pathname: "/auth",
+                    params: { mode: "login", returnUrl: "/(main)/tabs/feed" },
+                  })
+                }
+              />
+            ) : null}
+            <Button
+              label="Publicar oferta"
+              icon="plus"
+              onPress={irAPublicar}
+            />
+          </View>
         }
       >
         <Gradient
@@ -129,6 +151,48 @@ export default function FeedScreen() {
             </View>
           </View>
         </Gradient>
+
+        {!user ? (
+          <View className="flex-col gap-3 rounded-3xl border border-sage-200 bg-sage-50/90 p-4 md:flex-row md:items-center md:justify-between md:px-6 md:py-4">
+            <View className="flex-row items-center gap-3">
+              <View className="h-10 w-10 items-center justify-center rounded-2xl bg-sage-100">
+                <Icon name="handshake" size={20} className="text-sage-700" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-sm font-bold text-ink">
+                  ¿Querés comprar, vender o transportar hacienda?
+                </Text>
+                <Text className="text-xs text-ink-muted">
+                  Registrate gratis para consultar por lotes, publicar hacienda y pedir cotizaciones de flete.
+                </Text>
+              </View>
+            </View>
+            <View className="flex-row items-center gap-2">
+              <Button
+                label="Registrarme gratis"
+                icon="userPlus"
+                size="sm"
+                onPress={() =>
+                  router.push({
+                    pathname: "/auth",
+                    params: { mode: "registro", returnUrl: "/(main)/tabs/feed" },
+                  })
+                }
+              />
+              <Button
+                label="Iniciar sesión"
+                variant="secondary"
+                size="sm"
+                onPress={() =>
+                  router.push({
+                    pathname: "/auth",
+                    params: { mode: "login", returnUrl: "/(main)/tabs/feed" },
+                  })
+                }
+              />
+            </View>
+          </View>
+        ) : null}
 
         {!isSupabaseConfigured ? (
           <EmptyState

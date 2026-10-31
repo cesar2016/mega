@@ -23,6 +23,7 @@ export type OfertaResumen = {
   provincia?: string | null;
   localidad?: string | null;
   estado?: string | null;
+  created_at?: string | null;
   profiles?: { id?: string | null; nombre?: string | null; avatar_url?: string | null } | null;
   oferta_media?: OfertaMediaRow[] | null;
 };

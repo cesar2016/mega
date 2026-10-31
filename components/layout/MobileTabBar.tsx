@@ -1,6 +1,8 @@
 import React from "react";
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import { useAuthStore } from "store/authStore";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 
 /**
@@ -9,6 +11,8 @@ import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
  */
 export function MobileTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const user = useAuthStore((state) => state.user);
 
   return (
     <View
@@ -32,6 +36,14 @@ export function MobileTabBar({ state, descriptors, navigation }: BottomTabBarPro
             accessibilityRole="button"
             accessibilityState={{ selected: focused }}
             onPress={() => {
+              if (!user && route.name !== "feed") {
+                router.push({
+                  pathname: "/auth",
+                  params: { mode: "login", returnUrl: `/(main)/tabs/${route.name}` },
+                });
+                return;
+              }
+
               const event = navigation.emit({
                 type: "tabPress",
                 target: route.key,

@@ -14,11 +14,16 @@ export default function MainLayout() {
   const pathname = usePathname();
   const segments = useSegments();
 
-  // Las URLs de publicaciones (/oferta/:id) son públicas:
-  // los visitantes sin sesión deben poder ingresar directamente a ver el lote.
+  // La home/galería de ofertas (/tabs/feed) y las publicaciones (/oferta/:id) son públicas:
+  // los visitantes sin sesión deben poder explorar el mercado libremente.
   const isPublicRoute =
+    pathname === "/" ||
+    pathname === "" ||
     pathname?.startsWith("/oferta/") ||
-    (segments as string[])?.includes("oferta");
+    pathname?.endsWith("/tabs/feed") ||
+    pathname === "/tabs/feed" ||
+    (segments as string[])?.includes("oferta") ||
+    (segments as string[])?.includes("feed");
 
   const redirect = useAuthRedirect({ enabled: !isPublicRoute });
   if (redirect) return redirect;
