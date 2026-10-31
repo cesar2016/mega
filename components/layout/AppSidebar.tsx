@@ -1,7 +1,9 @@
 import React from "react";
 import { Pressable, Text, View } from "react-native";
 import { usePathname, useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "store/authStore";
+import { showToast } from "lib/utils";
 import { usePendientesMatch } from "lib/hooks/useMatches";
 import { useMensajesSinLeer } from "lib/hooks/useChat";
 import { Icon } from "components/ui/Icon";
@@ -23,7 +25,9 @@ const ROLE_LABEL: Record<string, string> = {
 export function AppSidebar() {
   const router = useRouter();
   const pathname = usePathname();
+  const queryClient = useQueryClient();
   const profile = useAuthStore((state) => state.profile);
+  const signOut = useAuthStore((state) => state.signOut);
 
   const activo = activeNavItem(pathname);
   const pendientes = usePendientesMatch({ enabled: !!profile });
@@ -136,6 +140,19 @@ export function AppSidebar() {
             className="h-8 w-8 items-center justify-center rounded-lg active:bg-surface-sunk"
           >
             <Icon name="chevronRight" size={16} className="text-ink-muted" />
+          </Pressable>
+          <Pressable
+            onPress={async () => {
+              await signOut();
+              queryClient.clear();
+              showToast("Sesión cerrada correctamente", "info");
+              router.replace("/(main)/tabs/feed");
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Cerrar sesión"
+            className="h-8 w-8 items-center justify-center rounded-lg active:bg-surface-sunk"
+          >
+            <Icon name="logOut" size={16} className="text-clay-600" />
           </Pressable>
         </View>
       ) : (

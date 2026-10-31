@@ -1,5 +1,7 @@
 import React from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "store/authStore";
 import { maskNombreUsuario, showToast } from "lib/utils";
 import { Icon } from "components/ui/Icon";
@@ -51,13 +53,31 @@ function Dato({
 }
 
 export default function PerfilScreen() {
-  const { profile, user, updateProfile, setUser } = useAuthStore();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { profile, user, updateProfile, signOut } = useAuthStore();
 
   const [editing, setEditing] = React.useState(false);
   const [nombre, setNombre] = React.useState(profile?.nombre || "");
   const [telefono, setTelefono] = React.useState(profile?.telefono || "");
   const [avatarUrl, setAvatarUrl] = React.useState(profile?.avatar_url || "");
   const [saving, setSaving] = React.useState(false);
+  const [cerrandoSesion, setCerrandoSesion] = React.useState(false);
+
+  const handleCerrarSesion = async () => {
+    try {
+      setCerrandoSesion(true);
+      await signOut();
+      queryClient.clear();
+      showToast("Sesión cerrada correctamente", "info");
+      router.replace("/(main)/tabs/feed");
+    } catch (err) {
+      console.error("Error al cerrar sesión:", err);
+      showToast("Error al cerrar sesión", "error");
+    } finally {
+      setCerrandoSesion(false);
+    }
+  };
 
   const saveProfile = async () => {
     if (!nombre.trim()) {
@@ -79,9 +99,36 @@ export default function PerfilScreen() {
 
   if (!user || !profile) {
     return (
-      <View className="flex-1 items-center justify-center gap-3 bg-canvas">
-        <ActivityIndicator size="large" className="text-sage-500" />
-        <Text className="text-sm text-ink-muted">Cargando perfil...</Text>
+      <View className="flex-1 bg-canvas">
+        <MobileTopBar title="Perfil" />
+        <Screen
+          eyebrow="Tu cuenta"
+          title="Perfil"
+          subtitle="Iniciá sesión o registrate para gestionar tus datos y publicaciones."
+        >
+          <Card className="items-center gap-3 py-8 text-center">
+            <View className="h-12 w-12 items-center justify-center rounded-2xl bg-sage-50">
+              <Icon name="user" size={24} className="text-sage-600" />
+            </View>
+            <Text className="text-base font-bold text-ink">No has iniciado sesión</Text>
+            <Text className="max-w-xs text-xs text-ink-muted">
+              Ingresá a tu cuenta para ver tu información y configurar tus preferencias.
+            </Text>
+            <View className="mt-2 flex-row gap-2">
+              <Button
+                label="Iniciar sesión"
+                variant="primary"
+                onPress={() => router.push({ pathname: "/auth", params: { mode: "login" } })}
+              />
+              <Button
+                label="Ir a la home"
+                variant="secondary"
+                icon="arrowLeft"
+                onPress={() => router.replace("/(main)/tabs/feed")}
+              />
+            </View>
+          </Card>
+        </Screen>
       </View>
     );
   }
@@ -235,14 +282,15 @@ export default function PerfilScreen() {
               <View className="flex-1 gap-1">
                 <Text className="text-sm font-bold text-ink">Cerrar sesión</Text>
                 <Text className="text-xs leading-5 text-ink-muted">
-                  Vas a salir de tu cuenta en este dispositivo.
+                  Vas a salir de tu cuenta en este dispositivo y volver a la home.
                 </Text>
               </View>
               <Button
                 label="Salir"
                 variant="danger"
                 size="sm"
-                onPress={() => setUser(null)}
+                loading={cerrandoSesion}
+                onPress={handleCerrarSesion}
               />
             </Card>
           </View>

@@ -40,6 +40,7 @@ interface AuthState {
   fetchProfile: () => Promise<void>;
   updateProfile: (data: Partial<UserProfile>) => Promise<void>;
   resetProfile: () => void;
+  signOut: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -134,6 +135,17 @@ export const useAuthStore = create<AuthState>()(
 
       resetProfile: () => {
         set({ profile: null });
+      },
+
+      signOut: async () => {
+        set({ user: null, profile: null, loading: false });
+        if (isSupabaseConfigured) {
+          try {
+            await supabase.auth.signOut();
+          } catch (err) {
+            console.error("Error signing out from Supabase:", err);
+          }
+        }
       },
     }),
     {
