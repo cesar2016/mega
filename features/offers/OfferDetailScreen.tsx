@@ -14,6 +14,7 @@ import { Button } from "components/ui/Button";
 import { Gradient, Screen } from "components/ui/Screen";
 import { MobileTopBar } from "components/layout/MobileTopBar";
 import { ShareOfferModal } from "./ShareOfferModal";
+import { PurchaseModal } from "./PurchaseModal";
 import { AuthPromptModal } from "features/auth/AuthPromptModal";
 import {
   fotosDe,
@@ -158,12 +159,14 @@ export default function OfferDetailScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
+  const profile = useAuthStore((state) => state.profile);
   const [activoId, setActivoId] = useState<string | null>(null);
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
   const [eliminando, setEliminando] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [purchaseModalVisible, setPurchaseModalVisible] = useState(false);
   const [authModalVisible, setAuthModalVisible] = useState(false);
-  const [authModalMotivo, setAuthModalMotivo] = useState<"chat" | "flete">("chat");
+  const [authModalMotivo, setAuthModalMotivo] = useState<"chat" | "flete" | "comprar">("chat");
 
   const onVolver = () => {
     if (router.canGoBack()) {
@@ -241,6 +244,15 @@ export default function OfferDetailScreen() {
     showToast("La solicitud de flete llega en la próxima versión", "info");
   };
 
+  const handleComprar = () => {
+    if (!user) {
+      setAuthModalMotivo("comprar");
+      setAuthModalVisible(true);
+      return;
+    }
+    setPurchaseModalVisible(true);
+  };
+
   const irAEditar = () =>
     router.push({ pathname: "/(main)/oferta-nueva", params: { id: oferta.id } });
 
@@ -286,6 +298,14 @@ export default function OfferDetailScreen() {
         }
         action={
           <View className="hidden flex-row items-center gap-2 md:flex">
+            {!esPropia ? (
+              <Button
+                label="Comprar lote"
+                icon="shoppingCart"
+                variant="accent"
+                onPress={handleComprar}
+              />
+            ) : null}
             <Button
               label="Compartir"
               icon="share"
@@ -563,6 +583,16 @@ export default function OfferDetailScreen() {
                 </View>
               ) : null}
 
+              {!esPropia ? (
+                <Button
+                  label="Comprar lote"
+                  icon="shoppingCart"
+                  variant="accent"
+                  size="lg"
+                  onPress={handleComprar}
+                />
+              ) : null}
+
               <View className="flex-row gap-2">
                 <Button
                   label={esPropia ? "Ver consultas" : "Consultar por chat"}
@@ -609,6 +639,14 @@ export default function OfferDetailScreen() {
           precio: oferta.precio,
           tipo_precio: oferta.tipo_precio,
         }}
+      />
+
+      <PurchaseModal
+        visible={purchaseModalVisible}
+        onClose={() => setPurchaseModalVisible(false)}
+        oferta={oferta}
+        user={user}
+        profile={profile}
       />
     </View>
   );

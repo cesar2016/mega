@@ -5,7 +5,7 @@ import { Icon } from "components/ui/Icon";
 import { Button } from "components/ui/Button";
 import { Badge } from "components/ui/Card";
 
-export type AuthPromptMotivo = "chat" | "flete";
+export type AuthPromptMotivo = "chat" | "flete" | "comprar";
 
 export interface AuthPromptModalProps {
   visible: boolean;
@@ -23,7 +23,7 @@ export interface AuthPromptModalProps {
 
 /**
  * Modal que invita al visitante no registrado o sin sesión a registrarse o iniciar sesión
- * al intentar consultar por chat o pedir flete sobre una publicación pública.
+ * al intentar consultar por chat, pedir flete o comprar sobre una publicación pública.
  */
 export function AuthPromptModal({
   visible,
@@ -35,6 +35,7 @@ export function AuthPromptModal({
   const router = useRouter();
 
   const esChat = motivo === "chat";
+  const esComprar = motivo === "comprar";
 
   const onIrARegistro = () => {
     onClose();
@@ -73,23 +74,25 @@ export function AuthPromptModal({
               <View
                 className={[
                   "h-11 w-11 items-center justify-center rounded-2xl",
-                  esChat ? "bg-sage-100" : "bg-clay-100",
+                  esComprar ? "bg-sage-500" : esChat ? "bg-sage-100" : "bg-clay-100",
                 ].join(" ")}
               >
                 <Icon
-                  name={esChat ? "message" : "truck"}
+                  name={esComprar ? "shoppingCart" : esChat ? "message" : "truck"}
                   size={20}
-                  className={esChat ? "text-sage-700" : "text-clay-700"}
+                  className={esComprar ? "text-white" : esChat ? "text-sage-700" : "text-clay-700"}
                 />
               </View>
               <View className="flex-1 pr-2">
                 <Text className="text-base font-bold text-ink">
-                  {esChat ? "Consultar por chat" : "Pedir flete"}
+                  {esComprar ? "Comprar lote" : esChat ? "Consultar por chat" : "Pedir flete"}
                 </Text>
                 <Text className="text-xs text-ink-muted">
-                  {esChat
-                    ? "Iniciá sesión para chatear con el vendedor"
-                    : "Iniciá sesión para cotizar el transporte"}
+                  {esComprar
+                    ? "Iniciá sesión para confirmar la compra del lote"
+                    : esChat
+                      ? "Iniciá sesión para chatear con el vendedor"
+                      : "Iniciá sesión para cotizar el transporte"}
                 </Text>
               </View>
             </View>
@@ -124,14 +127,18 @@ export function AuthPromptModal({
             {/* Mensaje descriptivo */}
             <View className="gap-1.5">
               <Text className="text-sm font-semibold text-ink">
-                {esChat
-                  ? "¿Querés hacer una consulta sobre este lote?"
-                  : "¿Querés solicitar transporte para esta hacienda?"}
+                {esComprar
+                  ? "¿Querés comprar este lote de hacienda?"
+                  : esChat
+                    ? "¿Querés hacer una consulta sobre este lote?"
+                    : "¿Querés solicitar transporte para esta hacienda?"}
               </Text>
               <Text className="text-xs leading-5 text-ink-soft">
-                {esChat
-                  ? "Para comunicarte de forma directa y segura con el productor de este lote, tenés que iniciar sesión o registrarte gratis en Mercado Ganadero."
-                  : "Para cotizar el flete y conectar con transportistas de hacienda verificados en tu zona, tenés que iniciar sesión o registrarte gratis."}
+                {esComprar
+                  ? "Para confirmar la operación y acceder a los datos de contacto directos del productor (teléfono, email y campo), iniciá sesión o registrate gratis en Mercado Ganadero."
+                  : esChat
+                    ? "Para comunicarte de forma directa y segura con el productor de este lote, tenés que iniciar sesión o registrarte gratis en Mercado Ganadero."
+                    : "Para cotizar el flete y conectar con transportistas de hacienda verificados en tu zona, tenés que iniciar sesión o registrarte gratis."}
               </Text>
             </View>
 
@@ -140,17 +147,21 @@ export function AuthPromptModal({
               <View className="flex-row items-center gap-2.5">
                 <Icon name="checkCircle" size={15} className="text-sage-600" />
                 <Text className="flex-1 text-xs font-medium text-sage-900">
-                  {esChat
-                    ? "Canal directo, privado y seguro entre partes"
-                    : "Cotizaciones ágiles según origen y destino"}
+                  {esComprar
+                    ? "Acceso inmediato al teléfono, WhatsApp y correo del vendedor"
+                    : esChat
+                      ? "Canal directo, privado y seguro entre partes"
+                      : "Cotizaciones ágiles según origen y destino"}
                 </Text>
               </View>
               <View className="flex-row items-center gap-2.5">
                 <Icon name="checkCircle" size={15} className="text-sage-600" />
                 <Text className="flex-1 text-xs font-medium text-sage-900">
-                  {esChat
-                    ? "Sin comisiones ocultas ni intermediarios"
-                    : "Red de fleteros con experiencia en ganado"}
+                  {esComprar
+                    ? "Envío automático de confirmación por email a ambas partes"
+                    : esChat
+                      ? "Sin comisiones ocultas ni intermediarios"
+                      : "Red de fleteros con experiencia en ganado"}
                 </Text>
               </View>
               <View className="flex-row items-center gap-2.5">
