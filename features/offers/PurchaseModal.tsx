@@ -455,13 +455,13 @@ export function PurchaseModal({
                   </View>
                   <Text className="text-xs leading-5 text-sage-800">
                     {emailInfo?.sinApiKey
-                      ? "La publicación quedó marcada como VENDIDA y los datos personales han sido desbloqueados en pantalla."
+                      ? "La publicación quedó marcada como VENDIDA y los datos personales han sido revelados en pantalla."
                       : `Se enviaron los emails de confirmación a ambas partes (${email || "tu correo"} y la casilla del productor) con el comprobante, el emblema oficial del sitio y los datos de contacto.`}
                   </Text>
                   {emailInfo?.sinApiKey ? (
                     <View className="mt-1 rounded-xl bg-clay-100 p-2.5">
                       <Text className="text-[11px] leading-4 text-clay-800">
-                        ℹ️ <Text className="font-semibold">Nota para el administrador:</Text> Para que los correos electrónicos se envíen a las casillas de correo externas, recordá agregar la variable <Text className="font-bold">RESEND_API_KEY</Text> en Vercel.
+                        ℹ️ <Text className="font-semibold">Nota de configuración:</Text> Para el despacho automático por Gmail, asegurate de tener <Text className="font-bold">GMAIL_USER</Text> y <Text className="font-bold">GMAIL_APP_PASSWORD</Text> configuradas en Vercel.
                       </Text>
                     </View>
                   ) : null}

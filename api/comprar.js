@@ -1,4 +1,13 @@
 /* eslint-env node */
+const fs = require("fs");
+const path = require("path");
+
+let nodemailer = null;
+try {
+  nodemailer = require("nodemailer");
+} catch (_e) {
+  // Opcional si no está instalado
+}
 
 function formatPrecio(precio, tipo_precio) {
   const num = Number(precio);
@@ -8,10 +17,10 @@ function formatPrecio(precio, tipo_precio) {
   return formatted;
 }
 
-function generarHtmlEmailComprador({ vendedor, comprador, oferta }) {
+function generarHtmlEmailComprador({ vendedor, comprador, oferta, usaCid = false }) {
   const precioTexto = formatPrecio(oferta.precio, oferta.tipo_precio);
   const ubicacion = [oferta.localidad, oferta.provincia].filter(Boolean).join(", ");
-  const logoUrl = "https://mercadoganadero.app/logo.png";
+  const logoSrc = usaCid ? "cid:logo_emblema" : "https://mercadoganadero.app/logo.png";
 
   return `
 <!DOCTYPE html>
@@ -25,7 +34,7 @@ function generarHtmlEmailComprador({ vendedor, comprador, oferta }) {
   <div style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 20px; overflow: hidden; border: 1px solid #E3DFD6; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
     <!-- Header con logo emblema oficial -->
     <div style="background-color: #2D4A36; padding: 30px 24px 24px 24px; text-align: center; color: #FFFFFF;">
-      <img src="${logoUrl}" alt="Mercado Ganadero" width="84" height="84" style="display: block; margin: 0 auto 12px auto; border-radius: 20px; border: 2px solid rgba(255,255,255,0.25); background-color: #FFFFFF; object-fit: contain;" />
+      <img src="${logoSrc}" alt="Mercado Ganadero" width="84" height="84" style="display: block; margin: 0 auto 12px auto; border-radius: 20px; border: 2px solid rgba(255,255,255,0.25); background-color: #FFFFFF; object-fit: contain;" />
       <h1 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">¡Compra confirmada!</h1>
       <p style="margin: 6px 0 0 0; font-size: 13px; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.5px;">Mercado Ganadero · Compra y venta de hacienda</p>
     </div>
@@ -74,10 +83,10 @@ function generarHtmlEmailComprador({ vendedor, comprador, oferta }) {
   `.trim();
 }
 
-function generarHtmlEmailVendedor({ vendedor, comprador, oferta }) {
+function generarHtmlEmailVendedor({ vendedor, comprador, oferta, usaCid = false }) {
   const precioTexto = formatPrecio(oferta.precio, oferta.tipo_precio);
   const ubicacion = [oferta.localidad, oferta.provincia].filter(Boolean).join(", ");
-  const logoUrl = "https://mercadoganadero.app/logo.png";
+  const logoSrc = usaCid ? "cid:logo_emblema" : "https://mercadoganadero.app/logo.png";
 
   return `
 <!DOCTYPE html>
@@ -91,7 +100,7 @@ function generarHtmlEmailVendedor({ vendedor, comprador, oferta }) {
   <div style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 20px; overflow: hidden; border: 1px solid #E3DFD6; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
     <!-- Header con logo emblema oficial -->
     <div style="background-color: #2D4A36; padding: 30px 24px 24px 24px; text-align: center; color: #FFFFFF;">
-      <img src="${logoUrl}" alt="Mercado Ganadero" width="84" height="84" style="display: block; margin: 0 auto 12px auto; border-radius: 20px; border: 2px solid rgba(255,255,255,0.25); background-color: #FFFFFF; object-fit: contain;" />
+      <img src="${logoSrc}" alt="Mercado Ganadero" width="84" height="84" style="display: block; margin: 0 auto 12px auto; border-radius: 20px; border: 2px solid rgba(255,255,255,0.25); background-color: #FFFFFF; object-fit: contain;" />
       <h1 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">¡Han comprado tu lote!</h1>
       <p style="margin: 6px 0 0 0; font-size: 13px; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.5px;">Mercado Ganadero · Compra y venta de hacienda</p>
     </div>
@@ -137,14 +146,45 @@ function generarHtmlEmailVendedor({ vendedor, comprador, oferta }) {
   `.trim();
 }
 
+/**
+ * Proveedor 1: Gmail SMTP vía Nodemailer
+ */
+function getGmailTransporter() {
+  if (!nodemailer) return null;
+
+  const user = process.env.GMAIL_USER || process.env.SMTP_USER || process.env.MAIL_USERNAME;
+  const pass =
+    process.env.GMAIL_APP_PASSWORD ||
+    process.env.SMTP_PASS ||
+    process.env.SMTP_PASSWORD ||
+    process.env.MAIL_PASSWORD;
+  const host = process.env.SMTP_HOST || "smtp.gmail.com";
+  const port = Number(process.env.SMTP_PORT || 465);
+
+  if (!user || !pass) {
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: {
+      user: user.trim(),
+      pass: pass.trim().replace(/\s+/g, ""), // Limpiar posibles espacios de app passwords
+    },
+  });
+}
+
+/**
+ * Proveedor 2: Resend API
+ */
 async function enviarEmailResend({ to, subject, html }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    console.warn("[comprar] RESEND_API_KEY no configurada. Omitiendo llamada a Resend para:", to);
-    return { ok: false, error: "RESEND_API_KEY no configurada en las variables de entorno de Vercel" };
+    return { ok: false, error: "RESEND_API_KEY no configurada" };
   }
 
-  // Probar con remitentes válidos (si el dominio no está verificado en Resend, onboarding@resend.dev siempre funciona)
   const senders = [
     process.env.RESEND_FROM_EMAIL,
     "Mercado Ganadero <notificaciones@mercadoganadero.app>",
@@ -169,13 +209,12 @@ async function enviarEmailResend({ to, subject, html }) {
       });
 
       const data = await res.json().catch(() => ({}));
-
       if (res.ok) {
-        console.log(`[comprar] Email enviado exitosamente a ${to} desde ${sender}. ID: ${data?.id}`);
-        return { ok: true, id: data?.id, sender };
+        console.log(`[comprar] Email enviado exitosamente a ${to} desde ${sender} vía Resend. ID: ${data?.id}`);
+        return { ok: true, provider: "resend", id: data?.id, sender };
       } else {
         lastError = data?.message || `HTTP ${res.status}: ${JSON.stringify(data)}`;
-        console.warn(`[comprar] Intento de envío a ${to} desde ${sender} falló:`, lastError);
+        console.warn(`[comprar] Intento de envío a ${to} desde ${sender} vía Resend falló:`, lastError);
       }
     } catch (err) {
       lastError = err.message;
@@ -183,7 +222,59 @@ async function enviarEmailResend({ to, subject, html }) {
     }
   }
 
-  return { ok: false, error: lastError };
+  return { ok: false, provider: "resend", error: lastError };
+}
+
+/**
+ * Orquestador de envío de correo (Intenta Gmail SMTP primero, luego Resend)
+ */
+async function despacharEmail({ to, subject, htmlGenerator, payload }) {
+  // 1. Probar primero con Gmail SMTP
+  const transporter = getGmailTransporter();
+  if (transporter) {
+    const fromUser = process.env.GMAIL_USER || process.env.SMTP_USER || process.env.MAIL_USERNAME;
+    const from = process.env.GMAIL_FROM || process.env.SMTP_FROM || `Mercado Ganadero <${fromUser}>`;
+
+    const attachments = [];
+    const logoPath = path.join(process.cwd(), "public", "logo.png");
+    if (fs.existsSync(logoPath)) {
+      attachments.push({
+        filename: "logo.png",
+        path: logoPath,
+        cid: "logo_emblema",
+      });
+    }
+
+    const html = htmlGenerator({ ...payload, usaCid: attachments.length > 0 });
+
+    try {
+      const info = await transporter.sendMail({
+        from,
+        to,
+        subject,
+        html,
+        attachments,
+      });
+      console.log(`[comprar] Email enviado exitosamente a ${to} vía Gmail SMTP (${info.messageId})`);
+      return { ok: true, provider: "gmail_smtp", messageId: info.messageId };
+    } catch (err) {
+      console.error("[comprar] Error al despachar con Gmail SMTP:", err.message);
+      // Fall through a Resend si hay error o si no funcionó
+    }
+  }
+
+  // 2. Si no hay Gmail SMTP o falló, probar con Resend
+  if (process.env.RESEND_API_KEY) {
+    const html = htmlGenerator({ ...payload, usaCid: false });
+    return await enviarEmailResend({ to, subject, html });
+  }
+
+  console.warn("[comprar] No se detectó configuración de Gmail SMTP (GMAIL_USER / GMAIL_APP_PASSWORD) ni RESEND_API_KEY.");
+  return {
+    ok: false,
+    sinConfig: true,
+    error: "Configurá GMAIL_USER y GMAIL_APP_PASSWORD en Vercel para activar los correos automáticos.",
+  };
 }
 
 module.exports = async function handler(req, res) {
@@ -236,7 +327,7 @@ module.exports = async function handler(req, res) {
       return res.status(404).json({ error: "Publicación no encontrada" });
     }
 
-    // 1b. Si el lote ya fue vendido, no permitir volver a comprarlo
+    // 1b. Si el lote ya fue vendido, rechazar compra duplicada
     if (oferta.estado === "vendida" || oferta.estado === "completada") {
       return res.status(400).json({
         error: "Este lote ya ha sido vendido y no se encuentra disponible.",
@@ -353,26 +444,27 @@ module.exports = async function handler(req, res) {
       provincia: oferta.provincia,
     };
 
-    // 5. Enviar emails a ambas partes
-    const htmlComprador = generarHtmlEmailComprador({ vendedor, comprador, oferta });
-    const htmlVendedor = generarHtmlEmailVendedor({ vendedor, comprador, oferta });
+    // 5. Enviar emails a ambas partes con Gmail SMTP (o Resend)
+    const emailPayload = { vendedor, comprador, oferta };
 
     let emailCompradorRes = { ok: false };
     let emailVendedorRes = { ok: false };
 
     if (comprador.email && !comprador.email.includes("@mercadoganadero.app")) {
-      emailCompradorRes = await enviarEmailResend({
+      emailCompradorRes = await despacharEmail({
         to: comprador.email,
         subject: `🐮 Confirmación de compra: Lote de ${oferta.categoria} - Mercado Ganadero`,
-        html: htmlComprador,
+        htmlGenerator: generarHtmlEmailComprador,
+        payload: emailPayload,
       });
     }
 
     if (vendedor.email && !vendedor.email.includes("contacto@mercadoganadero.app")) {
-      emailVendedorRes = await enviarEmailResend({
+      emailVendedorRes = await despacharEmail({
         to: vendedor.email,
         subject: `🐮 ¡Han comprado tu lote de ${oferta.categoria}! - Mercado Ganadero`,
-        html: htmlVendedor,
+        htmlGenerator: generarHtmlEmailVendedor,
+        payload: emailPayload,
       });
     }
 
@@ -416,16 +508,20 @@ module.exports = async function handler(req, res) {
       console.error("Error al registrar notificaciones:", e);
     }
 
+    const algunEmailEnviado = Boolean(emailCompradorRes.ok || emailVendedorRes.ok);
+    const sinConfiguracion = Boolean(emailCompradorRes.sinConfig && emailVendedorRes.sinConfig);
+
     return res.status(200).json({
       success: true,
       mensaje: "Compra confirmada exitosamente. Lote marcado como vendido.",
       loteVendido: true,
       emailCompradorEnviado: emailCompradorRes.ok,
       emailVendedorEnviado: emailVendedorRes.ok,
+      algunEmailEnviado,
+      sinConfiguracion,
       emailDetalle: {
         comprador: emailCompradorRes,
         vendedor: emailVendedorRes,
-        sinApiKey: !process.env.RESEND_API_KEY,
       },
       vendedor,
       comprador,
