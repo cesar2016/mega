@@ -11,7 +11,6 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Icon } from "components/ui/Icon";
 import { Button } from "components/ui/Button";
-import { Input } from "components/ui/Input";
 import { Badge } from "components/ui/Card";
 import { WhatsAppIcon } from "components/ui/SocialIcons";
 import { showToast } from "lib/utils";
@@ -53,6 +52,12 @@ type VendedorData = {
   provincia?: string | null;
 };
 
+type CompradorData = {
+  nombre: string;
+  telefono: string;
+  email: string;
+};
+
 function formatPrecio(precio: number, tipo_precio?: string | null) {
   const formatted = `$${Number(precio).toLocaleString("es-AR")}`;
   if (tipo_precio === "por_kilo") return `${formatted} / kg`;
@@ -71,13 +76,9 @@ export function PurchaseModal({
   const [phase, setPhase] = useState<"confirm" | "success">("confirm");
   const [loading, setLoading] = useState(false);
 
-  // Datos del comprador
-  const [nombre, setNombre] = useState(profile?.nombre || "");
-  const [telefono, setTelefono] = useState(profile?.telefono || "");
-  const [email, setEmail] = useState(user?.email || "");
-
-  // Datos del vendedor revelados tras confirmar
+  // Datos personales revelados estrictamente tras confirmar
   const [vendedor, setVendedor] = useState<VendedorData | null>(null);
+  const [comprador, setComprador] = useState<CompradorData | null>(null);
   const [emailInfo, setEmailInfo] = useState<{ enviado: boolean; sinApiKey?: boolean } | null>(null);
 
   useEffect(() => {
@@ -85,12 +86,10 @@ export function PurchaseModal({
       setPhase("confirm");
       setLoading(false);
       setVendedor(null);
+      setComprador(null);
       setEmailInfo(null);
-      setNombre((prev) => prev || profile?.nombre || "");
-      setTelefono((prev) => prev || profile?.telefono || "");
-      setEmail((prev) => prev || user?.email || "");
     }
-  }, [visible, profile?.nombre, profile?.telefono, user?.email]);
+  }, [visible]);
 
   const handleConfirmar = async () => {
     if (oferta.estado === "vendida" || oferta.estado === "completada") {
@@ -99,14 +98,9 @@ export function PurchaseModal({
       return;
     }
 
-    if (!nombre.trim()) {
-      showToast("Por favor indicá tu nombre de contacto", "error");
-      return;
-    }
-    if (!telefono.trim()) {
-      showToast("Por favor indicá un teléfono o WhatsApp de contacto", "error");
-      return;
-    }
+    const compradorNombre = (profile?.nombre || user?.email?.split("@")[0] || "Comprador").trim();
+    const compradorTelefono = (profile?.telefono || "").trim();
+    const compradorEmail = (user?.email || "").trim();
 
     try {
       setLoading(true);
@@ -126,9 +120,9 @@ export function PurchaseModal({
           body: JSON.stringify({
             ofertaId: oferta.id,
             compradorId: user?.id,
-            compradorNombre: nombre.trim(),
-            compradorTelefono: telefono.trim(),
-            compradorEmail: email.trim() || user?.email,
+            compradorNombre,
+            compradorTelefono,
+            compradorEmail,
           }),
         });
 
@@ -180,7 +174,7 @@ export function PurchaseModal({
                 usuario_id: oferta.productor_id,
                 tipo: "estado",
                 titulo: `¡Lote de ${oferta.categoria} vendido!`,
-                cuerpo: `${nombre.trim()} ha confirmado la compra de tu lote. Contactalo al ${telefono.trim()} o ${email.trim()}.`,
+                cuerpo: `${compradorNombre} ha confirmado la compra de tu lote.${compradorTelefono ? ` Contactalo al ${compradorTelefono}.` : ""}${compradorEmail ? ` Correo: ${compradorEmail}.` : ""}`,
                 entidad_tipo: "oferta",
                 entidad_id: oferta.id,
               },
@@ -218,8 +212,13 @@ export function PurchaseModal({
 
       setVendedor(vendedorObtenido);
       setEmailInfo({ enviado: emailEnviadoRes, sinApiKey: sinKeyRes });
+      setComprador({
+        nombre: compradorNombre,
+        telefono: compradorTelefono,
+        email: compradorEmail,
+      });
       setPhase("success");
-      showToast("¡Lote marcado como vendido! Datos intercambiados exitosamente.", "success");
+      showToast("¡Lote marcado como vendido! Datos personales revelados.", "success");
     } catch (err: any) {
       console.error("Error al confirmar compra:", err);
       showToast(err?.message || "Ocurrió un error al procesar la compra", "error");
@@ -362,66 +361,37 @@ export function PurchaseModal({
             {phase === "confirm" ? (
               <>
                 {/* Cuadro de Alerta / Advertencia */}
-                <View className="rounded-2xl border border-clay-200 bg-clay-50/60 p-4 gap-2">
+                <View className="rounded-2xl border border-clay-200 bg-clay-50/70 p-4 gap-3">
                   <View className="flex-row items-center gap-2">
-                    <Icon name="shield" size={16} className="text-clay-700" />
-                    <Text className="text-xs font-bold uppercase tracking-wider text-clay-800">
+                    <Icon name="shield" size={18} className="text-clay-700" />
+                    <Text className="text-sm font-bold text-clay-900">
                       Términos de la operación
                     </Text>
                   </View>
 
-                  <Text className="text-xs leading-5 text-clay-900">
-                    Al confirmar la compra:
+                  <Text className="text-xs leading-5 text-clay-800">
+                    ¿Estás seguro de que deseás confirmar la compra de este lote?
                   </Text>
-                  <View className="gap-1 pl-1">
-                    <Text className="text-xs leading-4 text-clay-800">
-                      • La publicación se marcará automáticamente con la <Text className="font-bold">cinta de VENDIDO</Text> y ya nadie más podrá comprar este lote.
-                    </Text>
-                    <Text className="text-xs leading-4 text-clay-800">
-                      • Se revelarán en pantalla los datos de contacto directos del productor (nombre, teléfono y email).
-                    </Text>
-                    <Text className="text-xs leading-4 text-clay-800">
-                      • Se despachará un correo electrónico de confirmación con el logo oficial y todos los datos a ambas partes.
-                    </Text>
+                  <View className="gap-2 pl-1">
+                    <View className="flex-row items-start gap-2">
+                      <Icon name="checkCircle" size={14} className="text-clay-700 mt-0.5" />
+                      <Text className="flex-1 text-xs leading-4 text-clay-800">
+                        La publicación se marcará automáticamente con la <Text className="font-bold">cinta de VENDIDO</Text> y ya nadie más podrá comprar este lote.
+                      </Text>
+                    </View>
+                    <View className="flex-row items-start gap-2">
+                      <Icon name="lock" size={14} className="text-clay-700 mt-0.5" />
+                      <Text className="flex-1 text-xs leading-4 text-clay-800">
+                        Por privacidad, <Text className="font-bold">los datos personales y de contacto se mantendrán ocultos hasta confirmar</Text> la compra.
+                      </Text>
+                    </View>
+                    <View className="flex-row items-start gap-2">
+                      <Icon name="mail" size={14} className="text-clay-700 mt-0.5" />
+                      <Text className="flex-1 text-xs leading-4 text-clay-800">
+                        Al confirmar, se revelarán en pantalla los datos de contacto directos del productor y se despachará el comprobante por correo electrónico oficial a ambas partes.
+                      </Text>
+                    </View>
                   </View>
-                </View>
-
-                {/* Formulario con los datos de contacto del comprador */}
-                <View className="rounded-2xl border border-line-soft bg-surface p-4 gap-3">
-                  <View className="flex-row items-center gap-2">
-                    <Icon name="user" size={16} className="text-sage-600" />
-                    <Text className="text-xs font-bold uppercase tracking-wider text-ink-muted">
-                      Tus datos de contacto (se enviarán al vendedor)
-                    </Text>
-                  </View>
-
-                  <Input
-                    label="Nombre y Apellido"
-                    placeholder="Ej. Juan Pérez"
-                    value={nombre}
-                    onChangeText={setNombre}
-                    icon="user"
-                  />
-
-                  <Input
-                    label="Teléfono / WhatsApp"
-                    placeholder="Ej. +54 9 11 1234-5678"
-                    value={telefono}
-                    onChangeText={setTelefono}
-                    keyboardType="phone-pad"
-                    icon="phone"
-                    hint="Fundamental para que el productor se comunique con vos"
-                  />
-
-                  <Input
-                    label="Email para la confirmación"
-                    placeholder="Ej. juanperez@correo.com"
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    icon="mail"
-                  />
                 </View>
 
                 {/* Acciones de confirmación */}
@@ -456,7 +426,7 @@ export function PurchaseModal({
                   <Text className="text-xs leading-5 text-sage-800">
                     {emailInfo?.sinApiKey
                       ? "La publicación quedó marcada como VENDIDA y los datos personales han sido revelados en pantalla."
-                      : `Se enviaron los emails de confirmación a ambas partes (${email || "tu correo"} y la casilla del productor) con el comprobante, el emblema oficial del sitio y los datos de contacto.`}
+                      : `Se enviaron los emails de confirmación a ambas partes (${comprador?.email || "tu correo"} y la casilla del productor) con el comprobante, el emblema oficial del sitio y los datos de contacto.`}
                   </Text>
                   {emailInfo?.sinApiKey ? (
                     <View className="mt-1 rounded-xl bg-clay-100 p-2.5">
@@ -567,14 +537,16 @@ export function PurchaseModal({
                     Tus datos compartidos con el productor:
                   </Text>
                   <Text className="text-xs text-ink-soft">
-                    • <Text className="font-semibold text-ink">{nombre}</Text>
+                    • <Text className="font-semibold text-ink">{comprador?.nombre || "Comprador"}</Text>
                   </Text>
-                  <Text className="text-xs text-ink-soft">
-                    • Teléfono: <Text className="font-semibold text-ink">{telefono}</Text>
-                  </Text>
-                  {email ? (
+                  {comprador?.telefono ? (
                     <Text className="text-xs text-ink-soft">
-                      • Email: <Text className="font-semibold text-ink">{email}</Text>
+                      • Teléfono: <Text className="font-semibold text-ink">{comprador.telefono}</Text>
+                    </Text>
+                  ) : null}
+                  {comprador?.email ? (
+                    <Text className="text-xs text-ink-soft">
+                      • Email: <Text className="font-semibold text-ink">{comprador.email}</Text>
                     </Text>
                   ) : null}
                 </View>
