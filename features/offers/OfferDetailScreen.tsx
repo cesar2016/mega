@@ -205,6 +205,7 @@ export default function OfferDetailScreen() {
 
   const oferta = data as Oferta;
   const esPropia = Boolean(user?.id && oferta.productor_id === user.id);
+  const esVendida = oferta.estado === "vendida" || oferta.estado === "completada";
   const todos = mediaOrdenado(oferta.oferta_media);
   const fotos = fotosDe(oferta.oferta_media);
   const videos = videosDe(oferta.oferta_media);
@@ -298,7 +299,7 @@ export default function OfferDetailScreen() {
         }
         action={
           <View className="hidden flex-row items-center gap-2 md:flex">
-            {!esPropia ? (
+            {!esPropia && !esVendida ? (
               <Button
                 label="Comprar lote"
                 icon="shoppingCart"
@@ -332,7 +333,29 @@ export default function OfferDetailScreen() {
         <View className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
           {/* Media */}
           <View className="gap-4">
-            <View className="h-60 w-full overflow-hidden rounded-3xl border border-line-soft bg-surface-sunk md:h-80">
+            <View className="relative h-60 w-full overflow-hidden rounded-3xl border border-line-soft bg-surface-sunk md:h-80">
+              {/* Cinta de Vendido */}
+              {esVendida ? (
+                <View
+                  pointerEvents="none"
+                  className="absolute left-0 top-0 z-30 h-36 w-36 overflow-hidden"
+                >
+                  <View
+                    style={{
+                      transform: [{ rotate: "-45deg" }],
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 3 },
+                      shadowOpacity: 0.4,
+                      shadowRadius: 4,
+                    }}
+                    className="absolute -left-12 top-7 w-48 items-center justify-center border-y border-white/40 bg-[#C2410C] py-2 shadow-lg"
+                  >
+                    <Text className="text-xs font-black tracking-widest text-white uppercase">
+                      LOTE VENDIDO
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
               {activo ? (
                 activo.tipo === "video" && activo.url ? (
                   <VideoPlayer url={activo.url} />
@@ -426,11 +449,17 @@ export default function OfferDetailScreen() {
               className="gap-3 rounded-3xl border border-line-soft p-5"
             >
               <View className="flex-row flex-wrap items-center gap-2">
-                <Badge tone="sage" icon="beef">
-                  {oferta.categoria?.toUpperCase() ?? "LOTE"}
-                </Badge>
+                {esVendida ? (
+                  <Badge tone="clay" icon="ban">
+                    LOTE VENDIDO
+                  </Badge>
+                ) : (
+                  <Badge tone="sage" icon="beef">
+                    {oferta.categoria?.toUpperCase() ?? "LOTE"}
+                  </Badge>
+                )}
                 {oferta.edad ? <Badge tone="wheat" icon="calendar">{oferta.edad}</Badge> : null}
-                {oferta.estado ? (
+                {oferta.estado && !esVendida ? (
                   <Badge tone={oferta.estado === "activa" ? "sky" : "neutral"}>
                     {oferta.estado}
                   </Badge>
@@ -438,7 +467,11 @@ export default function OfferDetailScreen() {
               </View>
 
               <View className="gap-1">
-                <Text className="text-3xl font-extrabold tracking-tight text-ink">
+                <Text
+                  className={`text-3xl font-extrabold tracking-tight ${
+                    esVendida ? "text-ink-muted line-through" : "text-ink"
+                  }`}
+                >
                   {formatPrecio(oferta)}
                 </Text>
                 {oferta.tipo_precio && oferta.tipo_precio !== "a_convenir" ? (
@@ -583,7 +616,19 @@ export default function OfferDetailScreen() {
                 </View>
               ) : null}
 
-              {!esPropia ? (
+              {esVendida ? (
+                <View className="rounded-2xl border border-clay-300 bg-clay-50/90 p-4 gap-2">
+                  <View className="flex-row items-center gap-2">
+                    <Icon name="ban" size={18} className="text-clay-700" />
+                    <Text className="text-sm font-bold text-clay-900">
+                      Publicación finalizada · Lote vendido
+                    </Text>
+                  </View>
+                  <Text className="text-xs leading-5 text-clay-800">
+                    Esta hacienda ya fue adquirida y la compra confirmada. Ya no está disponible para compra.
+                  </Text>
+                </View>
+              ) : !esPropia ? (
                 <Button
                   label="Comprar lote"
                   icon="shoppingCart"

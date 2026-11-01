@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useQueryClient } from "@tanstack/react-query";
 import { Icon } from "components/ui/Icon";
 import { Button } from "components/ui/Button";
 import { Input } from "components/ui/Input";
@@ -30,6 +31,7 @@ export type PurchaseModalProps = {
     peso_promedio?: number | null;
     provincia?: string | null;
     localidad?: string | null;
+    estado?: string | null;
     productor_id?: string | null;
     profiles?: {
       id?: string | null;
@@ -65,6 +67,7 @@ export function PurchaseModal({
   user,
   profile,
 }: PurchaseModalProps) {
+  const queryClient = useQueryClient();
   const [phase, setPhase] = useState<"confirm" | "success">("confirm");
   const [loading, setLoading] = useState(false);
 
@@ -75,12 +78,14 @@ export function PurchaseModal({
 
   // Datos del vendedor revelados tras confirmar
   const [vendedor, setVendedor] = useState<VendedorData | null>(null);
+  const [emailInfo, setEmailInfo] = useState<{ enviado: boolean; sinApiKey?: boolean } | null>(null);
 
   useEffect(() => {
     if (visible) {
       setPhase("confirm");
       setLoading(false);
       setVendedor(null);
+      setEmailInfo(null);
       setNombre((prev) => prev || profile?.nombre || "");
       setTelefono((prev) => prev || profile?.telefono || "");
       setEmail((prev) => prev || user?.email || "");
@@ -88,6 +93,12 @@ export function PurchaseModal({
   }, [visible, profile?.nombre, profile?.telefono, user?.email]);
 
   const handleConfirmar = async () => {
+    if (oferta.estado === "vendida" || oferta.estado === "completada") {
+      showToast("Este lote ya fue vendido y no se encuentra disponible", "info");
+      onClose();
+      return;
+    }
+
     if (!nombre.trim()) {
       showToast("Por favor indicá tu nombre de contacto", "error");
       return;
@@ -100,9 +111,11 @@ export function PurchaseModal({
     try {
       setLoading(true);
 
-      // Intentar primero con el endpoint serverless que envía emails con Resend y registra notificaciones
+      // 1. Intentar con el endpoint serverless que envía emails con Resend y actualiza estado a 'vendida'
       let apiExitosa = false;
       let vendedorObtenido: VendedorData | null = null;
+      let emailEnviadoRes = false;
+      let sinKeyRes = false;
 
       try {
         const res = await fetch("/api/comprar", {
@@ -124,14 +137,15 @@ export function PurchaseModal({
           if (data.success && data.vendedor) {
             apiExitosa = true;
             vendedorObtenido = data.vendedor;
+            emailEnviadoRes = Boolean(data.emailCompradorEnviado || data.emailVendedorEnviado);
+            sinKeyRes = Boolean(data.emailDetalle?.sinApiKey);
           }
         }
       } catch (e) {
-        // En entorno local o sin servidor serverless activo, caerá al fallback
         console.warn("Llamada a /api/comprar no disponible o fallida, usando fallback Supabase:", e);
       }
 
-      // Si no pudimos llamar a /api/comprar o devolvió error (ej. en desarrollo local con Metro)
+      // 2. Si falló la API serverless (ej. en desarrollo local con Metro), ejecutar fallback
       if (!apiExitosa || !vendedorObtenido) {
         let vendedorNombre = oferta.profiles?.nombre || "Productor";
         let vendedorTelefono = oferta.profiles?.telefono || "+54 9 11 4567-8900";
@@ -165,7 +179,7 @@ export function PurchaseModal({
               {
                 usuario_id: oferta.productor_id,
                 tipo: "estado",
-                titulo: `¡Lote de ${oferta.categoria} comprado!`,
+                titulo: `¡Lote de ${oferta.categoria} vendido!`,
                 cuerpo: `${nombre.trim()} ha confirmado la compra de tu lote. Contactalo al ${telefono.trim()} o ${email.trim()}.`,
                 entidad_tipo: "oferta",
                 entidad_id: oferta.id,
@@ -186,9 +200,26 @@ export function PurchaseModal({
         };
       }
 
+      // 3. Asegurar que la oferta quede marcada como 'vendida' en la base de datos
+      if (isSupabaseConfigured) {
+        try {
+          await supabase.from("ofertas").update({ estado: "vendida" }).eq("id", oferta.id);
+        } catch (errUp) {
+          console.error("Error al actualizar estado en Supabase:", errUp);
+        }
+      }
+
+      // 4. Invalidar queries para refrescar la UI inmediatamente
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["ofertas_activas"] }),
+        queryClient.invalidateQueries({ queryKey: ["oferta", oferta.id] }),
+        queryClient.invalidateQueries({ queryKey: ["ofertas_productor"] }),
+      ]);
+
       setVendedor(vendedorObtenido);
+      setEmailInfo({ enviado: emailEnviadoRes, sinApiKey: sinKeyRes });
       setPhase("success");
-      showToast("¡Compra confirmada! Datos intercambiados exitosamente.", "success");
+      showToast("¡Lote marcado como vendido! Datos intercambiados exitosamente.", "success");
     } catch (err: any) {
       console.error("Error al confirmar compra:", err);
       showToast(err?.message || "Ocurrió un error al procesar la compra", "error");
@@ -265,7 +296,7 @@ export function PurchaseModal({
                 </Text>
                 <Text className="text-xs text-ink-muted">
                   {phase === "success"
-                    ? "Datos personales intercambiados y emails enviados"
+                    ? "El lote ha quedado marcado como VENDIDO"
                     : "Intercambio directo de datos y notificación a ambas partes"}
                 </Text>
               </View>
@@ -290,9 +321,15 @@ export function PurchaseModal({
             {/* Resumen del Lote */}
             <View className="rounded-2xl border border-line-soft bg-surface-soft p-4 gap-2.5">
               <View className="flex-row items-center justify-between">
-                <Badge tone="sage" icon="beef">
-                  {oferta.categoria}
-                </Badge>
+                {phase === "success" ? (
+                  <Badge tone="clay" icon="ban">
+                    LOTE VENDIDO
+                  </Badge>
+                ) : (
+                  <Badge tone="sage" icon="beef">
+                    {oferta.categoria}
+                  </Badge>
+                )}
                 <Text className="text-base font-extrabold text-ink">{precioTexto}</Text>
               </View>
 
@@ -338,13 +375,13 @@ export function PurchaseModal({
                   </Text>
                   <View className="gap-1 pl-1">
                     <Text className="text-xs leading-4 text-clay-800">
+                      • La publicación se marcará automáticamente con la <Text className="font-bold">cinta de VENDIDO</Text> y ya nadie más podrá comprar este lote.
+                    </Text>
+                    <Text className="text-xs leading-4 text-clay-800">
                       • Se revelarán en pantalla los datos de contacto directos del productor (nombre, teléfono y email).
                     </Text>
                     <Text className="text-xs leading-4 text-clay-800">
-                      • Se enviará un correo electrónico de confirmación con los datos personales a ambas partes.
-                    </Text>
-                    <Text className="text-xs leading-4 text-clay-800">
-                      • Podrán coordinar el pago, la emisión de guía DTA/SENASA y el retiro de la hacienda.
+                      • Se despachará un correo electrónico de confirmación con el logo oficial y todos los datos a ambas partes.
                     </Text>
                   </View>
                 </View>
@@ -409,16 +446,25 @@ export function PurchaseModal({
             ) : (
               <>
                 {/* Banner de Éxito */}
-                <View className="rounded-2xl border border-sage-300 bg-sage-50 p-4 gap-1.5">
+                <View className="rounded-2xl border border-sage-300 bg-sage-50 p-4 gap-2">
                   <View className="flex-row items-center gap-2">
                     <Icon name="badgeCheck" size={18} className="text-sage-700" />
                     <Text className="text-sm font-bold text-sage-900">
-                      ¡Operación confirmada con éxito!
+                      ¡Operación confirmada · Lote Vendido!
                     </Text>
                   </View>
                   <Text className="text-xs leading-5 text-sage-800">
-                    Se enviaron los emails a ambas partes ({email || "tu correo"} y la casilla del productor) con el comprobante y los datos de contacto.
+                    {emailInfo?.sinApiKey
+                      ? "La publicación quedó marcada como VENDIDA y los datos personales han sido desbloqueados en pantalla."
+                      : `Se enviaron los emails de confirmación a ambas partes (${email || "tu correo"} y la casilla del productor) con el comprobante, el emblema oficial del sitio y los datos de contacto.`}
                   </Text>
+                  {emailInfo?.sinApiKey ? (
+                    <View className="mt-1 rounded-xl bg-clay-100 p-2.5">
+                      <Text className="text-[11px] leading-4 text-clay-800">
+                        ℹ️ <Text className="font-semibold">Nota para el administrador:</Text> Para que los correos electrónicos se envíen a las casillas de correo externas, recordá agregar la variable <Text className="font-bold">RESEND_API_KEY</Text> en Vercel.
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
 
                 {/* Datos Personales del Vendedor */}

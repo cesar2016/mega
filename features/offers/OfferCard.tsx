@@ -68,6 +68,7 @@ export function OfferCard({
   const [eliminando, setEliminando] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
+  const esVendida = oferta.estado === "vendida" || oferta.estado === "completada";
 
   const portada = portadaDe(oferta.oferta_media);
   const fotos = fotosDe(oferta.oferta_media).length;
@@ -135,7 +136,28 @@ export function OfferCard({
             </View>
           ) : null}
 
-          {oferta.estado && oferta.estado !== "activa" ? (
+          {/* Cinta de Vendido en Portada */}
+          {esVendida ? (
+            <View
+              pointerEvents="none"
+              className="absolute left-0 top-0 z-20 h-28 w-28 overflow-hidden"
+            >
+              <View
+                style={{
+                  transform: [{ rotate: "-45deg" }],
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.4,
+                  shadowRadius: 3,
+                }}
+                className="absolute -left-10 top-5 w-40 items-center justify-center border-y border-white/40 bg-[#C2410C] py-1.5 shadow-md"
+              >
+                <Text className="text-[10px] font-black tracking-widest text-white uppercase">
+                  VENDIDO
+                </Text>
+              </View>
+            </View>
+          ) : oferta.estado && oferta.estado !== "activa" ? (
             <View className="absolute left-2 top-2 rounded-lg bg-ink/70 px-2 py-1">
               <Text className="text-[10px] font-semibold uppercase text-white">
                 {oferta.estado}
@@ -170,15 +192,25 @@ export function OfferCard({
           <View className="gap-4 p-5">
             <View className="flex-row items-start justify-between gap-3">
               <View className="min-w-0 flex-1 gap-2">
-                <Badge tone="sage" icon="beef">
-                  {oferta.categoria?.toUpperCase() ?? "LOTE"}
-                </Badge>
+                {esVendida ? (
+                  <Badge tone="clay" icon="ban">
+                    VENDIDO
+                  </Badge>
+                ) : (
+                  <Badge tone="sage" icon="beef">
+                    {oferta.categoria?.toUpperCase() ?? "LOTE"}
+                  </Badge>
+                )}
                 <Text className="text-lg font-bold leading-6 text-ink" numberOfLines={2}>
                   {oferta.raza || "Lote de hacienda"}
                 </Text>
               </View>
               <View className="items-end">
-                <Text className="text-xl font-extrabold tracking-tight text-sage-600">
+                <Text
+                  className={`text-xl font-extrabold tracking-tight ${
+                    esVendida ? "text-ink-muted line-through" : "text-sage-600"
+                  }`}
+                >
                   {formatPrecioOferta(oferta)}
                 </Text>
                 {oferta.tipo_precio && oferta.tipo_precio !== "a_convenir" ? (

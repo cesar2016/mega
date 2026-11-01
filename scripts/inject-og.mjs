@@ -20,6 +20,9 @@ for (const file of [
   "og-banner.png",
   "og-banner-v2.jpg",
   "og-banner-v2.png",
+  "logo.png",
+  "logo_email.png",
+  "logo_mega.png",
 ]) {
   const src = path.join(publicDir, file);
   const dest = path.join(distDir, file);
