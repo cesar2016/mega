@@ -4,6 +4,7 @@ import { isSupabaseConfigured } from "lib/supabase";
 import { useResponsive } from "lib/hooks/useResponsive";
 import { useAuthStore } from "store/authStore";
 import { AppSidebar } from "components/layout/AppSidebar";
+import { PublicTopNavbar } from "components/layout/PublicTopNavbar";
 
 export default function MainLayout() {
   const user = useAuthStore((state) => state.user);
@@ -19,8 +20,19 @@ export default function MainLayout() {
     return <Redirect href="/onboarding" />;
   }
 
-  // En escritorio la navegación es lateral y acompaña a todas las pantallas
-  // (incluido el formulario de publicación y la vista de ofertas).
+  // Visitante no logueado: sin menú lateral, con navbar superior siempre fijo y permanente
+  if (!user) {
+    return (
+      <View className="flex-1 bg-canvas">
+        <PublicTopNavbar />
+        <View className="flex-1 min-h-0">
+          <Slot />
+        </View>
+      </View>
+    );
+  }
+
+  // En escritorio (usuario logueado) la navegación es lateral y acompaña a todas las pantallas
   if (isWide) {
     return (
       <View className="flex-1 flex-row bg-canvas">

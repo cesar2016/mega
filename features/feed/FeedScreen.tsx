@@ -8,11 +8,10 @@ import { useResponsive } from "lib/hooks/useResponsive";
 import { showToast } from "lib/utils";
 import { useAuthStore } from "store/authStore";
 import { Icon } from "components/ui/Icon";
-import { Avatar, EmptyState } from "components/ui/Avatar";
+import { EmptyState } from "components/ui/Avatar";
 import { Button } from "components/ui/Button";
 import { Grid } from "components/ui/Grid";
 import { Gradient, Screen } from "components/ui/Screen";
-import { Logo } from "components/ui/Logo";
 import { MobileTopBar } from "components/layout/MobileTopBar";
 import { OfferCard } from "features/offers/OfferCard";
 import type { OfertaResumen } from "features/offers/OfferCard";
@@ -133,51 +132,7 @@ export default function FeedScreen() {
 
   return (
     <View className="flex-1 bg-canvas">
-      {!user ? (
-        <View className="z-20 flex-row items-center justify-between border-b border-line-soft bg-surface/95 backdrop-blur-sm px-3 py-2.5 sm:px-4 sm:py-3 md:px-8">
-          <Pressable
-            onPress={() => router.push("/")}
-            className="flex-row items-center gap-2 sm:gap-3 active:opacity-80 cursor-pointer"
-            accessibilityRole="button"
-            accessibilityLabel="Ir al inicio"
-          >
-            <Logo size={width < 400 ? 34 : 40} className="rounded-full shadow-sm" />
-            <View>
-              <Text className="text-sm sm:text-base font-bold text-ink">Mercado Ganadero</Text>
-              {width >= 640 ? (
-                <Text className="text-xs text-ink-muted">Compra y venta de hacienda</Text>
-              ) : null}
-            </View>
-          </Pressable>
-
-          <View className="flex-row items-center gap-1.5 sm:gap-2">
-            <Button
-              label={width < 500 ? "Registro" : "Registrarme gratis"}
-              icon={width < 400 ? undefined : "userPlus"}
-              size="sm"
-              onPress={() =>
-                router.push({
-                  pathname: "/auth",
-                  params: { mode: "registro", returnUrl: "/" },
-                })
-              }
-            />
-            <Button
-              label={width < 500 ? "Entrar" : "Iniciar sesión"}
-              variant="secondary"
-              size="sm"
-              onPress={() =>
-                router.push({
-                  pathname: "/auth",
-                  params: { mode: "login", returnUrl: "/" },
-                })
-              }
-            />
-          </View>
-        </View>
-      ) : (
-        <MobileTopBar title="Ofertas" action onActionPress={irAPublicar} />
-      )}
+      {user ? <MobileTopBar title="Ofertas" action onActionPress={irAPublicar} /> : null}
 
       <Screen
         eyebrow="Mercado Ganadero"

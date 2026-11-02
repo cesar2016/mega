@@ -191,7 +191,7 @@ export default function OfferDetailScreen() {
   if (error || !data) {
     return (
       <View className="flex-1 bg-canvas">
-        <MobileTopBar title="Publicación" onBack={onVolver} />
+        {user ? <MobileTopBar title="Publicación" onBack={onVolver} /> : null}
         <Screen>
           <EmptyState
             icon="alert"
@@ -282,13 +282,15 @@ export default function OfferDetailScreen() {
 
   return (
     <View className="flex-1 bg-canvas">
-      <MobileTopBar
-        title="Publicación"
-        onBack={onVolver}
-        action
-        actionIcon="share"
-        onActionPress={() => setShareModalVisible(true)}
-      />
+      {user ? (
+        <MobileTopBar
+          title="Publicación"
+          onBack={onVolver}
+          action
+          actionIcon="share"
+          onActionPress={() => setShareModalVisible(true)}
+        />
+      ) : null}
 
       <Screen
         eyebrow={oferta.categoria}
@@ -695,7 +697,7 @@ export default function OfferDetailScreen() {
         profile={profile}
       />
 
-      <StandaloneMobileTabBar activeTab="feed" />
+      {user ? <StandaloneMobileTabBar activeTab="feed" /> : null}
     </View>
   );
 }
