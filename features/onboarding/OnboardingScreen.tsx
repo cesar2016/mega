@@ -142,14 +142,28 @@ export default function OnboardingScreen() {
           ) : (
             <View className="gap-4 rounded-3xl border border-line-soft bg-surface p-5 shadow-soft md:p-7">
               <Input
-                label="Nombre de usuario (único)"
+                label="Nombre de usuario para mostrar (único)"
                 value={formState.nombre}
-                onChangeText={(text: string) => setFormState((prev) => ({ ...prev, nombre: text }))}
-                placeholder="Ej: JuanPerez o CabañaNorte"
+                onChangeText={(text: string) =>
+                  setFormState((prev) => ({ ...prev, nombre: text.replace(/\s+/g, "") }))
+                }
+                placeholder="Ej: Estancia_2026! o Ganadero#88"
                 icon="user"
                 autoCapitalize="none"
                 autoCorrect={false}
-                hint="Tu nombre único visible en el mercado."
+                hint="Mín. 8 caracteres, sin espacios, con números y símbolos. Se mostrará completo en el mercado."
+              />
+
+              <Input
+                label="Nombre y apellido / Razón social (opcional)"
+                value={formState.nombre_completo || ""}
+                onChangeText={(text: string) =>
+                  setFormState((prev) => ({ ...prev, nombre_completo: text }))
+                }
+                placeholder="Ej: Juan Pérez / Agropecuaria El Trébol S.A."
+                icon="user"
+                autoCapitalize="words"
+                hint="Privado: solo se comparte al concretar una compra/venta."
               />
 
               <Input
@@ -166,7 +180,7 @@ export default function OnboardingScreen() {
               />
 
               <Input
-                label="Teléfono (opcional)"
+                label="Teléfono / WhatsApp (opcional)"
                 value={formState.telefono || ""}
                 onChangeText={(text: string) =>
                   setFormState((prev) => ({ ...prev, telefono: text }))
@@ -175,6 +189,37 @@ export default function OnboardingScreen() {
                 keyboardType="phone-pad"
                 icon="phone"
               />
+
+              <Input
+                label="Establecimiento / Cabaña (opcional)"
+                value={formState.establecimiento || ""}
+                onChangeText={(text: string) =>
+                  setFormState((prev) => ({ ...prev, establecimiento: text }))
+                }
+                placeholder="Ej: Estancia La Esperanza"
+                icon="landmark"
+              />
+
+              <View className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Input
+                  label="Provincia (opcional)"
+                  value={formState.provincia || ""}
+                  onChangeText={(text: string) =>
+                    setFormState((prev) => ({ ...prev, provincia: text }))
+                  }
+                  placeholder="Ej: Córdoba"
+                  icon="mapPin"
+                />
+                <Input
+                  label="Localidad (opcional)"
+                  value={formState.localidad || ""}
+                  onChangeText={(text: string) =>
+                    setFormState((prev) => ({ ...prev, localidad: text }))
+                  }
+                  placeholder="Ej: Río Cuarto"
+                  icon="mapPin"
+                />
+              </View>
 
               {error ? (
                 <View className="flex-row items-start gap-2 rounded-2xl bg-clay-50 px-3.5 py-3">

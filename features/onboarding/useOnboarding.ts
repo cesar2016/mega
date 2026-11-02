@@ -3,15 +3,29 @@ import { useRouter } from "expo-router";
 import { z } from "zod";
 import { supabase } from "lib/supabase";
 import { useAuthStore } from "store/authStore";
-import { isValidCuitFormat } from "lib/utils";
+import { isValidCuitFormat, validarNombreUsuario } from "lib/utils";
 
 const RoleSchema = z.enum(["productor", "comprador", "fletero"]);
 
-// Esquema de onboarding: nombre de usuario, cuit, teléfono, rol
+// Esquema de onboarding: nombre de usuario para mostrar, nombre completo, cuit, teléfono, establecimiento, provincia, localidad, rol
 const OnboardingSchema = z.object({
-  nombre: z.string().min(3, "Nombre de usuario muy corto (mínimo 3 caracteres)").max(30),
-  cuit: z.string().refine((val) => !val || isValidCuitFormat(val), "El CUIT debe tener el formato 00-12345678-0").optional(),
+  nombre: z
+    .string()
+    .min(8, "El nombre de usuario debe tener al menos 8 caracteres")
+    .max(40)
+    .refine((val) => !validarNombreUsuario(val), {
+      message:
+        "El nombre de usuario debe tener al menos 8 caracteres, sin espacios, e incluir números y caracteres especiales",
+    }),
+  nombre_completo: z.string().optional(),
+  cuit: z
+    .string()
+    .refine((val) => !val || isValidCuitFormat(val), "El CUIT debe tener el formato 00-12345678-0")
+    .optional(),
   telefono: z.string().regex(/^[\d+\-\s()]*$/, "Teléfono inválido").optional(),
+  establecimiento: z.string().optional(),
+  provincia: z.string().optional(),
+  localidad: z.string().optional(),
   rol: RoleSchema,
 });
 
@@ -26,8 +40,12 @@ export function useOnboarding() {
 
   const [formState, setFormState] = useState<OnboardingFormValues>({
     nombre: profile?.nombre || (user as any)?.user_metadata?.nombre || "",
+    nombre_completo: profile?.nombre_completo || "",
     cuit: profile?.cuit || (user as any)?.user_metadata?.cuit || "",
     telefono: profile?.telefono || "",
+    establecimiento: profile?.establecimiento || "",
+    provincia: profile?.provincia || "",
+    localidad: profile?.localidad || "",
     rol: "productor",
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -90,6 +108,12 @@ export function useOnboarding() {
 
   const onSubmit = async () => {
     try {
+      const errUsuario = validarNombreUsuario(formState.nombre);
+      if (errUsuario) {
+        setError(errUsuario);
+        return;
+      }
+
       const validated = OnboardingSchema.parse(formState);
       setIsLoading(true);
       setError(null);
@@ -139,16 +163,24 @@ export function useOnboarding() {
 
       if (completeError) throw completeError;
 
-      // 2b. Actualizar CUIT en profiles y productores
-      if (validated.cuit) {
-        await supabase
-          .from("profiles")
-          .update({ cuit: validated.cuit })
-          .eq("id", user?.id);
+      // 2b. Actualizar campos extendidos en profiles y productores
+      await supabase
+        .from("profiles")
+        .update({
+          cuit: validated.cuit || null,
+          nombre_completo: validated.nombre_completo?.trim() || null,
+          establecimiento: validated.establecimiento?.trim() || null,
+          provincia: validated.provincia?.trim() || null,
+          localidad: validated.localidad?.trim() || null,
+        })
+        .eq("id", user?.id);
 
-        await supabase
-          .from("productores")
-          .upsert({ user_id: user?.id, cuit: validated.cuit });
+      if (validated.cuit || validated.establecimiento) {
+        await supabase.from("productores").upsert({
+          user_id: user?.id,
+          cuit: validated.cuit || null,
+          establecimiento: validated.establecimiento?.trim() || null,
+        });
       }
 
       // Refrescar el perfil: el guard de (main) lee onboarding_completado

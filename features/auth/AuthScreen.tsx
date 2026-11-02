@@ -10,7 +10,7 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { z } from "zod";
 import { supabase } from "lib/supabase";
-import { formatCuit, isValidCuitFormat, showToast } from "lib/utils";
+import { formatCuit, isValidCuitFormat, showToast, validarNombreUsuario } from "lib/utils";
 import { Icon } from "components/ui/Icon";
 import { Button } from "components/ui/Button";
 import { Input } from "components/ui/Input";
@@ -23,8 +23,12 @@ const AuthSchema = z.object({
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
   nombre: z
     .string()
-    .min(3, "El nombre de usuario debe tener al menos 3 caracteres")
-    .max(30, "El nombre de usuario no puede superar los 30 caracteres")
+    .min(8, "El nombre de usuario debe tener al menos 8 caracteres")
+    .max(40, "El nombre de usuario no puede superar los 40 caracteres")
+    .refine((val) => !validarNombreUsuario(val), {
+      message:
+        "El nombre de usuario debe tener al menos 8 caracteres, sin espacios, e incluir números y caracteres especiales",
+    })
     .optional(),
   cuit: z
     .string()
@@ -91,9 +95,9 @@ export default function AuthScreen() {
     setInfo(null);
 
     if (mode === "registro") {
-      const nombreLimpio = nombre.trim();
-      if (nombreLimpio.length < 3) {
-        setError("Ingresá un nombre de usuario (mínimo 3 caracteres)");
+      const errUsuario = validarNombreUsuario(nombre);
+      if (errUsuario) {
+        setError(errUsuario);
         return;
       }
       if (!cuit.trim()) {
@@ -356,17 +360,17 @@ export default function AuthScreen() {
                 {mode === "registro" ? (
                   <>
                     <Input
-                      label="Nombre de usuario (único)"
+                      label="Nombre de usuario para mostrar (único)"
                       value={nombre}
                       onChangeText={(t: string) => {
-                        setNombre(t);
+                        setNombre(t.replace(/\s+/g, ""));
                         setError(null);
                       }}
-                      placeholder="Ej: JuanPerez o CabañaElTrebol"
+                      placeholder="Ej: Estancia_2026! o Ganadero#88"
                       autoCapitalize="none"
                       autoCorrect={false}
                       icon="user"
-                      hint="Identificador único en el mercado (mínimo 3 caracteres)."
+                      hint="Mín. 8 caracteres, sin espacios, con números y símbolos (ej: _ - . # @ !). Será tu nombre público visible sin restricciones."
                     />
 
                     <Input

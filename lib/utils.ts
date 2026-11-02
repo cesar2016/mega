@@ -9,22 +9,39 @@ export function showToast(message: string, type: "success" | "error" | "info" = 
 }
 
 /**
- * Enmascara el nombre de otros usuarios dejando visibles sólo los primeros
- * 3 caracteres seguidos de `****` (ej.: "Cesar" -> "Ces****"). Si `esPropio`
- * es `true`, devuelve el nombre completo sin ocultar.
+ * Devuelve el nombre de usuario para mostrar públicamente sin restricciones ni ocultamiento.
  */
 export function maskNombreUsuario(
   nombre?: string | null,
-  fallback = "Usu****",
-  esPropio = false
+  fallback = "Usuario",
+  _esPropio = false
 ): string {
   const limpio = (nombre ?? "").trim();
-  if (!limpio) return esPropio ? "Sin nombre" : fallback;
-  if (esPropio) return limpio;
-  if (limpio.endsWith("****")) return limpio;
-  const prefijo = limpio.slice(0, Math.min(3, limpio.length));
-  const formateado = prefijo.charAt(0).toUpperCase() + prefijo.slice(1).toLowerCase();
-  return `${formateado}****`;
+  if (!limpio) return fallback === "Usu****" ? "Usuario" : fallback;
+  return limpio;
+}
+
+/**
+ * Valida las reglas del nombre de usuario único:
+ * - No menos de 8 caracteres
+ * - Sin espacios
+ * - Debe contener al menos un número y al menos un carácter especial
+ */
+export function validarNombreUsuario(nombre: string): string | null {
+  const val = nombre.trim();
+  if (val.length < 8) {
+    return "El nombre de usuario debe tener al menos 8 caracteres.";
+  }
+  if (/\s/.test(val)) {
+    return "El nombre de usuario no puede contener espacios.";
+  }
+  if (!/[0-9]/.test(val)) {
+    return "El nombre de usuario debe incluir al menos un número.";
+  }
+  if (!/[^a-zA-Z0-9\s]/.test(val)) {
+    return "El nombre de usuario debe incluir al menos un carácter especial (ej: _ - . @ # $ * !).";
+  }
+  return null;
 }
 
 /**
@@ -43,5 +60,3 @@ export function formatCuit(val: string): string {
 export function isValidCuitFormat(cuit: string): boolean {
   return /^\d{2}-\d{8}-\d{1}$/.test(cuit);
 }
-
-

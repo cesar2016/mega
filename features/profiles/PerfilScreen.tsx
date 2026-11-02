@@ -1,12 +1,20 @@
-import React from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { useAuthStore } from "store/authStore";
+import { supabase, isSupabaseConfigured } from "lib/supabase";
+import { useAuthStore, UserRol } from "store/authStore";
 import { useAuthRedirect } from "lib/hooks/useAuthRedirect";
 import { useMisOperaciones } from "lib/hooks/useOperaciones";
-import { maskNombreUsuario, showToast } from "lib/utils";
+import {
+  formatCuit,
+  isValidCuitFormat,
+  maskNombreUsuario,
+  showToast,
+  validarNombreUsuario,
+} from "lib/utils";
 import { Icon } from "components/ui/Icon";
+import type { IconName } from "components/ui/Icon.types";
 import { Avatar } from "components/ui/Avatar";
 import { Badge, Card } from "components/ui/Card";
 import { Button } from "components/ui/Button";
@@ -17,7 +25,7 @@ import { MobileTopBar } from "components/layout/MobileTopBar";
 const ROLE_LABEL: Record<string, string> = {
   productor: "Compra y venta de hacienda",
   comprador: "Compra y venta de hacienda",
-  fletero: "Transportista",
+  fletero: "Transportista / Fletero",
   admin: "Administrador",
 };
 
@@ -33,7 +41,7 @@ function Dato({
   label,
   value,
 }: {
-  icon: "user" | "shield" | "landmark" | "signal" | "mail" | "phone";
+  icon: IconName;
   label: string;
   value: string;
 }) {
@@ -58,19 +66,62 @@ export default function PerfilScreen() {
   const redirect = useAuthRedirect({ returnUrl: "/(main)/tabs/perfil" });
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { profile, user, updateProfile, signOut } = useAuthStore();
+  const { profile, user, updateProfile, fetchProfile, signOut } = useAuthStore();
   const { data: operaciones } = useMisOperaciones(user?.id);
   const cantVentas = operaciones?.ventas.length ?? 0;
   const cantCompras = operaciones?.compras.length ?? 0;
 
-  const [editing, setEditing] = React.useState(false);
-  const [nombre, setNombre] = React.useState(profile?.nombre || "");
-  const [telefono, setTelefono] = React.useState(profile?.telefono || "");
-  const [avatarUrl, setAvatarUrl] = React.useState(profile?.avatar_url || "");
-  const [saving, setSaving] = React.useState(false);
-  const [cerrandoSesion, setCerrandoSesion] = React.useState(false);
+  const [editing, setEditing] = useState(false);
+  const [nombre, setNombre] = useState(profile?.nombre || "");
+  const [nombreCompleto, setNombreCompleto] = useState(profile?.nombre_completo || "");
+  const [cuit, setCuit] = useState(profile?.cuit || "");
+  const [telefono, setTelefono] = useState(profile?.telefono || "");
+  const [establecimiento, setEstablecimiento] = useState(profile?.establecimiento || "");
+  const [renspa, setRenspa] = useState(profile?.renspa || "");
+  const [provincia, setProvincia] = useState(profile?.provincia || "");
+  const [localidad, setLocalidad] = useState(profile?.localidad || "");
+  const [rolForm, setRolForm] = useState<UserRol>(profile?.rol || "productor");
+  const [radioKm, setRadioKm] = useState(String(profile?.radio_km ?? 200));
+  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || "");
+  const [formError, setFormError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [cerrandoSesion, setCerrandoSesion] = useState(false);
+
+  useEffect(() => {
+    if (profile && !editing) {
+      setNombre(profile.nombre || "");
+      setNombreCompleto(profile.nombre_completo || "");
+      setCuit(profile.cuit || "");
+      setTelefono(profile.telefono || "");
+      setEstablecimiento(profile.establecimiento || "");
+      setRenspa(profile.renspa || "");
+      setProvincia(profile.provincia || "");
+      setLocalidad(profile.localidad || "");
+      setRolForm(profile.rol || "productor");
+      setRadioKm(String(profile.radio_km ?? 200));
+      setAvatarUrl(profile.avatar_url || "");
+    }
+  }, [profile, editing]);
 
   if (redirect) return redirect;
+
+  const handleToggleEdit = () => {
+    setFormError(null);
+    if (!editing && profile) {
+      setNombre(profile.nombre || "");
+      setNombreCompleto(profile.nombre_completo || "");
+      setCuit(profile.cuit || "");
+      setTelefono(profile.telefono || "");
+      setEstablecimiento(profile.establecimiento || "");
+      setRenspa(profile.renspa || "");
+      setProvincia(profile.provincia || "");
+      setLocalidad(profile.localidad || "");
+      setRolForm(profile.rol || "productor");
+      setRadioKm(String(profile.radio_km ?? 200));
+      setAvatarUrl(profile.avatar_url || "");
+    }
+    setEditing(!editing);
+  };
 
   const handleCerrarSesion = async () => {
     try {
@@ -88,17 +139,82 @@ export default function PerfilScreen() {
   };
 
   const saveProfile = async () => {
-    if (!nombre.trim()) {
-      showToast("El nombre no puede quedar vacío", "error");
+    setFormError(null);
+    const nombreLimpio = nombre.trim();
+    const cuitLimpio = cuit.trim();
+
+    const errUsuario = validarNombreUsuario(nombreLimpio);
+    if (errUsuario) {
+      setFormError(errUsuario);
+      showToast(errUsuario, "error");
       return;
     }
+
+    if (cuitLimpio && !isValidCuitFormat(cuitLimpio)) {
+      const msg = "El CUIT debe tener el formato 00-12345678-0 (11 dígitos con guiones).";
+      setFormError(msg);
+      showToast(msg, "error");
+      return;
+    }
+
     try {
       setSaving(true);
-      await updateProfile({ nombre, telefono, avatar_url: avatarUrl });
+
+      // Verificar unicidad de nombre de usuario y CUIT si cambiaron
+      if (isSupabaseConfigured && user?.id) {
+        const { data: disp, error: dispError } = await supabase.rpc("verificar_disponibilidad", {
+          p_nombre: nombreLimpio,
+          p_cuit: cuitLimpio || null,
+          p_user_id: user.id,
+        });
+
+        if (!dispError && disp) {
+          if (!disp.nombre_disponible) {
+            const msg = "Ese nombre de usuario ya está en uso. Elegí otro diferente.";
+            setFormError(msg);
+            showToast(msg, "error");
+            setSaving(false);
+            return;
+          }
+          if (cuitLimpio && !disp.cuit_disponible) {
+            const msg = "Ese número de CUIT ya está registrado en otra cuenta.";
+            setFormError(msg);
+            showToast(msg, "error");
+            setSaving(false);
+            return;
+          }
+        }
+      }
+
+      const parsedRadio = parseInt(radioKm, 10);
+
+      await updateProfile({
+        nombre: nombreLimpio,
+        nombre_completo: nombreCompleto.trim() || null,
+        cuit: cuitLimpio || null,
+        telefono: telefono.trim() || null,
+        establecimiento: establecimiento.trim() || null,
+        renspa: renspa.trim() || null,
+        provincia: provincia.trim() || null,
+        localidad: localidad.trim() || null,
+        rol: rolForm,
+        radio_km: !isNaN(parsedRadio) && parsedRadio > 0 ? parsedRadio : 200,
+        avatar_url: avatarUrl.trim() || null,
+      });
+
+      await fetchProfile();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["ofertas_activas"] }),
+        queryClient.invalidateQueries({ queryKey: ["ofertas_vendidas"] }),
+        queryClient.invalidateQueries({ queryKey: ["ofertas_productor"] }),
+      ]);
+
       showToast("Perfil actualizado correctamente", "success");
       setEditing(false);
-    } catch (err) {
-      showToast("No se pudo actualizar el perfil", "error");
+    } catch (err: any) {
+      const msg = err?.message || "No se pudo actualizar el perfil";
+      setFormError(msg);
+      showToast(msg, "error");
       console.error(err);
     } finally {
       setSaving(false);
@@ -142,21 +258,23 @@ export default function PerfilScreen() {
   }
 
   const rol = profile.rol;
+  const ubicacionTexto =
+    [profile.localidad, profile.provincia].filter(Boolean).join(", ") || "Sin cargar";
 
   return (
     <View className="flex-1 bg-canvas">
       <MobileTopBar title="Perfil" />
 
       <Screen
-        eyebrow="Tu cuenta (privada)"
+        eyebrow="Tu cuenta"
         title="Perfil"
-        subtitle={`Tus datos personales nunca se muestran a otros usuarios. En el mercado te ven como ${maskNombreUsuario(profile.nombre)}.`}
+        subtitle={`En el mercado tu nombre de usuario público para mostrar es ${maskNombreUsuario(profile.nombre)}. Tus datos de contacto privados solo se comparten al concretar una operación.`}
         action={
           <Button
             label={editing ? "Cancelar" : "Editar perfil"}
             icon={editing ? "x" : "pencil"}
             variant={editing ? "secondary" : "primary"}
-            onPress={() => setEditing(!editing)}
+            onPress={handleToggleEdit}
             className="hidden md:flex"
           />
         }
@@ -171,10 +289,10 @@ export default function PerfilScreen() {
             <View className="min-w-0 flex-1 gap-2">
               <View className="flex-row flex-wrap items-center gap-2">
                 <Text className="text-xl font-extrabold tracking-tight text-ink">
-                  {profile.nombre || "Sin nombre"}
+                  {maskNombreUsuario(profile.nombre)}
                 </Text>
-                <Badge tone="neutral" icon="lock">
-                  {`Público: ${maskNombreUsuario(profile.nombre)}`}
+                <Badge tone="sage" icon="user">
+                  Nombre público visible
                 </Badge>
                 {profile.verificado ? (
                   <Badge tone="sage" icon="badgeCheck">
@@ -194,38 +312,161 @@ export default function PerfilScreen() {
           </View>
 
           <Pressable
-            onPress={() => setEditing(!editing)}
+            onPress={handleToggleEdit}
             accessibilityRole="button"
             className="flex-row items-center gap-2 self-start rounded-2xl border border-line bg-surface/80 px-3.5 py-2.5 active:bg-surface-sunk md:hidden"
           >
             <Icon name={editing ? "x" : "pencil"} size={16} className="text-ink-soft" />
             <Text className="text-sm font-semibold text-ink">
-              {editing ? "Cancelar" : "Editar"}
+              {editing ? "Cancelar" : "Editar perfil"}
             </Text>
           </Pressable>
         </Gradient>
 
         {editing ? (
           <Card className="gap-4">
-            <Text className="text-base font-bold text-ink">Editar tus datos</Text>
+            <View className="gap-1">
+              <Text className="text-base font-bold text-ink">Editar datos del perfil</Text>
+              <Text className="text-xs text-ink-muted">
+                Completá o actualizá toda la información de tu cuenta.
+              </Text>
+            </View>
 
-            <Input
-              label="Nombre completo"
-              value={nombre}
-              onChangeText={setNombre}
-              placeholder="Nombre completo"
-              icon="user"
-              autoCapitalize="words"
-            />
+            <View className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Input
+                label="Nombre de usuario para mostrar (único)"
+                value={nombre}
+                onChangeText={(t: string) => {
+                  setNombre(t.replace(/\s+/g, ""));
+                  setFormError(null);
+                }}
+                placeholder="Ej: Estancia_2026! o Ganadero#88"
+                icon="user"
+                autoCapitalize="none"
+                autoCorrect={false}
+                hint="Mín. 8 caracteres, sin espacios, con números y caracteres especiales."
+              />
 
-            <Input
-              label="Teléfono"
-              value={telefono}
-              onChangeText={setTelefono}
-              placeholder="+54 9 11 1234-5678"
-              keyboardType="phone-pad"
-              icon="phone"
-            />
+              <Input
+                label="Nombre y apellido / Razón social"
+                value={nombreCompleto}
+                onChangeText={setNombreCompleto}
+                placeholder="Ej: Juan Pérez / Agropecuaria S.A."
+                icon="user"
+                autoCapitalize="words"
+                hint="Dato privado para tus operaciones de compra y venta."
+              />
+
+              <Input
+                label="Número de CUIT (único)"
+                value={cuit}
+                onChangeText={(t: string) => {
+                  setCuit(formatCuit(t));
+                  setFormError(null);
+                }}
+                placeholder="00-12345678-0"
+                keyboardType="numeric"
+                maxLength={13}
+                icon="shield"
+                hint="Formato requerido: 00-12345678-0."
+              />
+
+              <Input
+                label="Teléfono / WhatsApp"
+                value={telefono}
+                onChangeText={setTelefono}
+                placeholder="+54 9 11 1234-5678"
+                keyboardType="phone-pad"
+                icon="phone"
+              />
+
+              <Input
+                label="Establecimiento / Cabaña"
+                value={establecimiento}
+                onChangeText={setEstablecimiento}
+                placeholder="Ej: Estancia San Martín"
+                icon="landmark"
+              />
+
+              <Input
+                label="Número de RENSPA"
+                value={renspa}
+                onChangeText={setRenspa}
+                placeholder="Ej: 04.001.0.00123/00"
+                icon="tag"
+              />
+
+              <Input
+                label="Provincia"
+                value={provincia}
+                onChangeText={setProvincia}
+                placeholder="Ej: Córdoba"
+                icon="mapPin"
+              />
+
+              <Input
+                label="Localidad"
+                value={localidad}
+                onChangeText={setLocalidad}
+                placeholder="Ej: Río Cuarto"
+                icon="mapPin"
+              />
+            </View>
+
+            {/* Selector de actividad principal */}
+            <View className="gap-2">
+              <Text className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                Actividad principal
+              </Text>
+              <View className="flex-row gap-2">
+                {(
+                  [
+                    { id: "productor" as UserRol, label: "Compra y venta de hacienda", icon: "beef" as const },
+                    { id: "fletero" as UserRol, label: "Transportista / Fletero", icon: "truck" as const },
+                  ]
+                ).map((item) => {
+                  const active =
+                    rolForm === item.id || (item.id === "productor" && rolForm === "comprador");
+                  return (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => setRolForm(item.id)}
+                      className={[
+                        "flex-1 flex-row items-center justify-center gap-2 rounded-2xl border px-3 py-3",
+                        active
+                          ? "border-sage-500 bg-sage-50"
+                          : "border-line-soft bg-surface-soft",
+                      ].join(" ")}
+                    >
+                      <Icon
+                        name={item.icon}
+                        size={16}
+                        className={active ? "text-sage-700" : "text-ink-muted"}
+                      />
+                      <Text
+                        className={[
+                          "text-xs font-bold",
+                          active ? "text-sage-800" : "text-ink-soft",
+                        ].join(" ")}
+                      >
+                        {item.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            {rolForm === "fletero" ? (
+              <Input
+                label="Radio de cobertura (km)"
+                value={radioKm}
+                onChangeText={(t: string) => setRadioKm(t.replace(/\D/g, ""))}
+                placeholder="200"
+                keyboardType="numeric"
+                icon="signal"
+              />
+            ) : null}
 
             <Input
               label="URL del avatar (opcional)"
@@ -236,7 +477,14 @@ export default function PerfilScreen() {
               autoCapitalize="none"
             />
 
-            <View className="flex-row gap-3">
+            {formError ? (
+              <View className="flex-row items-start gap-2 rounded-2xl bg-clay-50 px-3.5 py-3">
+                <Icon name="alert" size={16} className="mt-0.5 text-clay-600" />
+                <Text className="flex-1 text-sm font-medium text-clay-700">{formError}</Text>
+              </View>
+            ) : null}
+
+            <View className="flex-row gap-3 pt-1">
               <Button
                 label="Cancelar"
                 variant="secondary"
@@ -314,21 +562,43 @@ export default function PerfilScreen() {
                 Datos de la cuenta
               </Text>
               <View className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <Dato icon="user" label="Nombre" value={profile.nombre || "—"} />
+                <Dato
+                  icon="user"
+                  label="Nombre de usuario (para mostrar)"
+                  value={profile.nombre || "—"}
+                />
+                <Dato
+                  icon="user"
+                  label="Nombre y apellido / Razón social"
+                  value={profile.nombre_completo || "Sin cargar"}
+                />
                 <Dato icon="mail" label="Email" value={user.email ?? "—"} />
+                <Dato icon="landmark" label="CUIT" value={profile.cuit || "Sin cargar"} />
+                <Dato
+                  icon="phone"
+                  label="Teléfono / WhatsApp"
+                  value={profile.telefono || "Sin cargar"}
+                />
+                <Dato
+                  icon="landmark"
+                  label="Establecimiento / Cabaña"
+                  value={profile.establecimiento || "Sin cargar"}
+                />
+                <Dato
+                  icon="tag"
+                  label="RENSPA"
+                  value={profile.renspa || "Sin cargar"}
+                />
+                <Dato
+                  icon="mapPin"
+                  label="Ubicación"
+                  value={ubicacionTexto}
+                />
                 <Dato
                   icon="shield"
                   label="Verificación"
                   value={profile.verificado ? "Sí, identidad validada" : "Pendiente"}
                 />
-                <Dato
-                  icon="phone"
-                  label="Teléfono"
-                  value={profile.telefono || "Sin cargar"}
-                />
-                {rol !== "fletero" ? (
-                  <Dato icon="landmark" label="CUIT" value={profile.cuit || "Sin cargar"} />
-                ) : null}
                 {rol === "fletero" ? (
                   <Dato
                     icon="signal"
