@@ -79,7 +79,7 @@ export function PurchaseModal({
   // Datos personales revelados estrictamente tras confirmar
   const [vendedor, setVendedor] = useState<VendedorData | null>(null);
   const [comprador, setComprador] = useState<CompradorData | null>(null);
-  const [emailInfo, setEmailInfo] = useState<{ enviado: boolean; sinApiKey?: boolean } | null>(null);
+  const [emailInfo, setEmailInfo] = useState<{ enviado: boolean; sinConfig?: boolean } | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -105,11 +105,11 @@ export function PurchaseModal({
     try {
       setLoading(true);
 
-      // 1. Intentar con el endpoint serverless que envía emails con Resend y actualiza estado a 'vendida'
+      // 1. Intentar con el endpoint serverless que envía emails y actualiza estado a 'vendida'
       let apiExitosa = false;
       let vendedorObtenido: VendedorData | null = null;
       let emailEnviadoRes = false;
-      let sinKeyRes = false;
+      let sinConfigRes = false;
 
       try {
         const res = await fetch("/api/comprar", {
@@ -132,7 +132,7 @@ export function PurchaseModal({
             apiExitosa = true;
             vendedorObtenido = data.vendedor;
             emailEnviadoRes = Boolean(data.emailCompradorEnviado || data.emailVendedorEnviado);
-            sinKeyRes = Boolean(data.emailDetalle?.sinApiKey);
+            sinConfigRes = Boolean(data.sinConfiguracion || !emailEnviadoRes);
           }
         }
       } catch (e) {
@@ -211,7 +211,7 @@ export function PurchaseModal({
       ]);
 
       setVendedor(vendedorObtenido);
-      setEmailInfo({ enviado: emailEnviadoRes, sinApiKey: sinKeyRes });
+      setEmailInfo({ enviado: emailEnviadoRes, sinConfig: sinConfigRes });
       setComprador({
         nombre: compradorNombre,
         telefono: compradorTelefono,
@@ -424,14 +424,14 @@ export function PurchaseModal({
                     </Text>
                   </View>
                   <Text className="text-xs leading-5 text-sage-800">
-                    {emailInfo?.sinApiKey
-                      ? "La publicación quedó marcada como VENDIDA y los datos personales han sido revelados en pantalla."
-                      : `Se enviaron los emails de confirmación a ambas partes (${comprador?.email || "tu correo"} y la casilla del productor) con el comprobante, el emblema oficial del sitio y los datos de contacto.`}
+                    {emailInfo?.enviado
+                      ? `Se enviaron los emails de confirmación a ambas partes (${comprador?.email || "tu correo"} y la casilla del productor) con el comprobante, el emblema oficial del sitio y los datos de contacto.`
+                      : "La publicación quedó marcada como VENDIDA y los datos de contacto han sido revelados en pantalla."}
                   </Text>
-                  {emailInfo?.sinApiKey ? (
-                    <View className="mt-1 rounded-xl bg-clay-100 p-2.5">
-                      <Text className="text-[11px] leading-4 text-clay-800">
-                        ℹ️ <Text className="font-semibold">Nota de configuración:</Text> Para el despacho automático por Gmail, asegurate de tener <Text className="font-bold">GMAIL_USER</Text> y <Text className="font-bold">GMAIL_APP_PASSWORD</Text> configuradas en Vercel.
+                  {!emailInfo?.enviado ? (
+                    <View className="mt-1 rounded-xl bg-amber-50 border border-amber-200 p-2.5">
+                      <Text className="text-[11px] leading-4 text-amber-900">
+                        ⚠️ <Text className="font-semibold">Aviso de correo:</Text> El correo automático no se pudo despachar porque aún no se han configurado las credenciales de correo (<Text className="font-bold">GMAIL_USER</Text> / <Text className="font-bold">GMAIL_APP_PASSWORD</Text> o <Text className="font-bold">RESEND_API_KEY</Text>) en Vercel.
                       </Text>
                     </View>
                   ) : null}

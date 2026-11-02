@@ -509,19 +509,24 @@ module.exports = async function handler(req, res) {
     }
 
     const algunEmailEnviado = Boolean(emailCompradorRes.ok || emailVendedorRes.ok);
-    const sinConfiguracion = Boolean(emailCompradorRes.sinConfig && emailVendedorRes.sinConfig);
+    const tieneConfiguracion = Boolean(
+      (process.env.GMAIL_USER || process.env.SMTP_USER || process.env.MAIL_USERNAME) &&
+      (process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || process.env.SMTP_PASSWORD || process.env.MAIL_PASSWORD)
+    ) || Boolean(process.env.RESEND_API_KEY);
+    const sinConfiguracion = !tieneConfiguracion || Boolean(emailCompradorRes.sinConfig || emailVendedorRes.sinConfig);
 
     return res.status(200).json({
       success: true,
       mensaje: "Compra confirmada exitosamente. Lote marcado como vendido.",
       loteVendido: true,
-      emailCompradorEnviado: emailCompradorRes.ok,
-      emailVendedorEnviado: emailVendedorRes.ok,
+      emailCompradorEnviado: Boolean(emailCompradorRes.ok),
+      emailVendedorEnviado: Boolean(emailVendedorRes.ok),
       algunEmailEnviado,
       sinConfiguracion,
       emailDetalle: {
         comprador: emailCompradorRes,
         vendedor: emailVendedorRes,
+        sinConfiguracion,
       },
       vendedor,
       comprador,
