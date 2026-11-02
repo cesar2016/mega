@@ -13,6 +13,7 @@ import { Badge, Card, SectionHeader } from "components/ui/Card";
 import { Button } from "components/ui/Button";
 import { Gradient, Screen } from "components/ui/Screen";
 import { MobileTopBar } from "components/layout/MobileTopBar";
+import { StandaloneMobileTabBar } from "components/layout/MobileTabBar";
 import { ShareOfferModal } from "./ShareOfferModal";
 import { PurchaseModal } from "./PurchaseModal";
 import { AuthPromptModal } from "features/auth/AuthPromptModal";
@@ -693,6 +694,8 @@ export default function OfferDetailScreen() {
         user={user}
         profile={profile}
       />
+
+      <StandaloneMobileTabBar activeTab="feed" />
     </View>
   );
 }

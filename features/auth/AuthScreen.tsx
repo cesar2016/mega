@@ -10,7 +10,7 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { z } from "zod";
 import { supabase } from "lib/supabase";
-import { showToast } from "lib/utils";
+import { formatCuit, isValidCuitFormat, showToast } from "lib/utils";
 import { Icon } from "components/ui/Icon";
 import { Button } from "components/ui/Button";
 import { Input } from "components/ui/Input";
@@ -21,7 +21,15 @@ import { BackgroundVideo } from "components/ui/BackgroundVideo";
 const AuthSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
-  nombre: z.string().min(2, "Nombre muy corto").optional(),
+  nombre: z
+    .string()
+    .min(3, "El nombre de usuario debe tener al menos 3 caracteres")
+    .max(30, "El nombre de usuario no puede superar los 30 caracteres")
+    .optional(),
+  cuit: z
+    .string()
+    .refine((val) => !val || isValidCuitFormat(val), "El CUIT debe tener el formato 00-12345678-0")
+    .optional(),
 });
 
 type Mode = "login" | "registro";
@@ -65,6 +73,7 @@ export default function AuthScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nombre, setNombre] = useState("");
+  const [cuit, setCuit] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [emailPendiente, setEmailPendiente] = useState<string | null>(null);
@@ -81,15 +90,27 @@ export default function AuthScreen() {
     setError(null);
     setInfo(null);
 
-    if (mode === "registro" && nombre.trim().length < 2) {
-      setError("Ingresá tu nombre y apellido (mínimo 2 caracteres)");
-      return;
+    if (mode === "registro") {
+      const nombreLimpio = nombre.trim();
+      if (nombreLimpio.length < 3) {
+        setError("Ingresá un nombre de usuario (mínimo 3 caracteres)");
+        return;
+      }
+      if (!cuit.trim()) {
+        setError("Ingresá tu número de CUIT con formato 00-12345678-0");
+        return;
+      }
+      if (!isValidCuitFormat(cuit.trim())) {
+        setError("El CUIT debe tener el formato 00-12345678-0 (11 dígitos con guiones)");
+        return;
+      }
     }
 
     const parsed = AuthSchema.safeParse({
       email: email.trim(),
       password,
       nombre: mode === "registro" ? nombre.trim() : undefined,
+      cuit: mode === "registro" ? cuit.trim() : undefined,
     });
 
     if (!parsed.success) {
@@ -114,12 +135,34 @@ export default function AuthScreen() {
         setEmailPendiente(null);
         showToast("Sesión iniciada", "success");
       } else {
+        // Verificar unicidad de Nombre de Usuario y CUIT antes del registro
+        const { data: disp, error: dispError } = await supabase.rpc("verificar_disponibilidad", {
+          p_nombre: parsed.data.nombre,
+          p_cuit: parsed.data.cuit,
+        });
+
+        if (!dispError && disp) {
+          if (!disp.nombre_disponible) {
+            setError("El nombre de usuario ya está registrado. Elegí otro diferente.");
+            setLoading(false);
+            return;
+          }
+          if (!disp.cuit_disponible) {
+            setError("El número de CUIT ya se encuentra registrado en la plataforma.");
+            setLoading(false);
+            return;
+          }
+        }
+
         const { data, error: signUpError } = await supabase.auth.signUp({
           email: parsed.data.email,
           password: parsed.data.password,
-          // El trigger handle_new_user crea el profile con este nombre.
+          // El trigger handle_new_user crea el profile con nombre y cuit
           options: {
-            data: { nombre: parsed.data.nombre },
+            data: {
+              nombre: parsed.data.nombre,
+              cuit: parsed.data.cuit,
+            },
             emailRedirectTo: getEmailRedirectUrl(),
           },
         });
@@ -311,14 +354,35 @@ export default function AuthScreen() {
 
               <View className="gap-4 rounded-3xl border border-line-soft bg-white p-5 shadow-card md:p-7">
                 {mode === "registro" ? (
-                  <Input
-                    label="Nombre y apellido"
-                    value={nombre}
-                    onChangeText={setNombre}
-                    placeholder="Ej: Juan Pérez"
-                    autoCapitalize="words"
-                    icon="user"
-                  />
+                  <>
+                    <Input
+                      label="Nombre de usuario (único)"
+                      value={nombre}
+                      onChangeText={(t: string) => {
+                        setNombre(t);
+                        setError(null);
+                      }}
+                      placeholder="Ej: JuanPerez o CabañaElTrebol"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      icon="user"
+                      hint="Identificador único en el mercado (mínimo 3 caracteres)."
+                    />
+
+                    <Input
+                      label="Número de CUIT (único)"
+                      value={cuit}
+                      onChangeText={(t: string) => {
+                        setCuit(formatCuit(t));
+                        setError(null);
+                      }}
+                      placeholder="00-12345678-0"
+                      keyboardType="numeric"
+                      maxLength={13}
+                      icon="shield"
+                      hint="Formato requerido: 00-12345678-0 (11 dígitos)."
+                    />
+                  </>
                 ) : null}
 
                 <Input

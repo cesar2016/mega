@@ -27,4 +27,21 @@ export function maskNombreUsuario(
   return `${formateado}****`;
 }
 
+/**
+ * Formatea una cadena a formato CUIT: 00-12345678-0
+ */
+export function formatCuit(val: string): string {
+  const digits = val.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 10) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}-${digits.slice(2, 10)}-${digits.slice(10, 11)}`;
+}
+
+/**
+ * Valida que el CUIT tenga exactamente el formato 00-12345678-0 (11 dígitos con guiones)
+ */
+export function isValidCuitFormat(cuit: string): boolean {
+  return /^\d{2}-\d{8}-\d{1}$/.test(cuit);
+}
+
 

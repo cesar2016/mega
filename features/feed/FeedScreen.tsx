@@ -134,7 +134,7 @@ export default function FeedScreen() {
   return (
     <View className="flex-1 bg-canvas">
       {!user ? (
-        <View className="flex-row items-center justify-between border-b border-line-soft bg-surface/90 px-3 py-2.5 sm:px-4 sm:py-3 md:px-8">
+        <View className="z-20 flex-row items-center justify-between border-b border-line-soft bg-surface/95 backdrop-blur-sm px-3 py-2.5 sm:px-4 sm:py-3 md:px-8">
           <Pressable
             onPress={() => router.push("/")}
             className="flex-row items-center gap-2 sm:gap-3 active:opacity-80 cursor-pointer"

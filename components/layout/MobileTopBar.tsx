@@ -24,7 +24,7 @@ export function MobileTopBar({
   const profile = useAuthStore((state) => state.profile);
 
   return (
-    <View className="flex-row items-center gap-3 border-b border-line-soft bg-surface/80 px-4 py-3 md:hidden">
+    <View className="z-20 flex-row items-center gap-3 border-b border-line-soft bg-surface/95 backdrop-blur-sm px-4 py-3 md:hidden">
       {onBack ? (
         <Pressable
           onPress={onBack}

@@ -94,7 +94,7 @@ export const useAuthStore = create<AuthState>()(
           set({
             profile: {
               ...row,
-              cuit: row.productores?.cuit ?? null,
+              cuit: row.cuit ?? row.productores?.cuit ?? null,
               verificado: row.productores?.verificado ?? row.fleteros?.verificado ?? null,
               radio_km: row.fleteros?.radio_km ?? null,
             } as UserProfile,

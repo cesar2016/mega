@@ -19,6 +19,7 @@ type InputProps = {
   multiline?: boolean;
   numberOfLines?: number;
   editable?: boolean;
+  maxLength?: number;
   className?: string;
   inputClassName?: string;
   testID?: string;
@@ -39,6 +40,7 @@ export function Input({
   multiline,
   numberOfLines,
   editable = true,
+  maxLength,
   className = "",
   inputClassName = "",
   testID,
@@ -83,6 +85,7 @@ export function Input({
           multiline={multiline}
           numberOfLines={numberOfLines}
           editable={editable}
+          maxLength={maxLength}
           className={[
             "flex-1 bg-transparent text-base text-ink outline-none focus:outline-none",
             multiline ? "min-h-[88px] text-left" : "",

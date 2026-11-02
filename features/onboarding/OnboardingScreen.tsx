@@ -1,6 +1,7 @@
 import React from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useOnboarding } from "./useOnboarding";
+import { formatCuit } from "lib/utils";
 import { Icon } from "components/ui/Icon";
 import type { IconName } from "components/ui/Icon.types";
 import { Button } from "components/ui/Button";
@@ -141,12 +142,27 @@ export default function OnboardingScreen() {
           ) : (
             <View className="gap-4 rounded-3xl border border-line-soft bg-surface p-5 shadow-soft md:p-7">
               <Input
-                label="Nombre completo"
+                label="Nombre de usuario (único)"
                 value={formState.nombre}
                 onChangeText={(text: string) => setFormState((prev) => ({ ...prev, nombre: text }))}
-                placeholder="Ej: Juan Pérez"
+                placeholder="Ej: JuanPerez o CabañaNorte"
                 icon="user"
-                autoCapitalize="words"
+                autoCapitalize="none"
+                autoCorrect={false}
+                hint="Tu nombre único visible en el mercado."
+              />
+
+              <Input
+                label="Número de CUIT"
+                value={formState.cuit || ""}
+                onChangeText={(text: string) =>
+                  setFormState((prev) => ({ ...prev, cuit: formatCuit(text) }))
+                }
+                placeholder="00-12345678-0"
+                keyboardType="numeric"
+                maxLength={13}
+                icon="shield"
+                hint="Formato requerido: 00-12345678-0."
               />
 
               <Input

@@ -20,16 +20,8 @@ export default function MainLayout() {
   }
 
   // En escritorio la navegación es lateral y acompaña a todas las pantallas
-  // (incluido el formulario de publicación).
+  // (incluido el formulario de publicación y la vista de ofertas).
   if (isWide) {
-    if (!user) {
-      return (
-        <View className="flex-1 bg-canvas">
-          <Slot />
-        </View>
-      );
-    }
-
     return (
       <View className="flex-1 flex-row bg-canvas">
         <AppSidebar />
