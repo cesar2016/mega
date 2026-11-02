@@ -353,7 +353,7 @@ export function useBorradorConsulta(params: {
             tipo_precio,
             provincia,
             localidad,
-            profiles (
+            profiles!productor_id (
               id,
               nombre
             )

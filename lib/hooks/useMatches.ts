@@ -37,7 +37,7 @@ const MATCH_SELECT = `
     provincia,
     localidad,
     estado,
-    profiles (id, nombre, rol),
+    profiles!productor_id (id, nombre, rol),
     oferta_media (${OFERTA_MEDIA_SELECT})
   ),
   demandas (

@@ -38,7 +38,7 @@ export function useOfertasActivas(options?: { enabled?: boolean }) {
         .from("ofertas")
         .select(`
           *,
-          profiles (id, nombre, rol),
+          profiles!productor_id (id, nombre, rol),
           oferta_media (${OFERTA_MEDIA_SELECT})
         `)
         .eq("estado", "activa")
@@ -63,7 +63,7 @@ export function useOfertasVendidas(options?: { enabled?: boolean }) {
         .from("ofertas")
         .select(`
           *,
-          profiles (id, nombre, rol),
+          profiles!productor_id (id, nombre, rol),
           oferta_media (${OFERTA_MEDIA_SELECT})
         `)
         .eq("estado", "vendida")
@@ -87,7 +87,7 @@ export function useOfertasTodas(options?: { enabled?: boolean }) {
         .from("ofertas")
         .select(`
           *,
-          profiles (id, nombre, rol),
+          profiles!productor_id (id, nombre, rol),
           oferta_media (${OFERTA_MEDIA_SELECT})
         `)
         .in("estado", ["activa", "vendida"])
@@ -110,7 +110,7 @@ export function useOfertasPorProductor(productorId: string) {
         .from("ofertas")
         .select(`
           *,
-          profiles (id, nombre, rol),
+          profiles!productor_id (id, nombre, rol),
           oferta_media (${OFERTA_MEDIA_SELECT})
         `)
         .eq("productor_id", productorId)
@@ -132,7 +132,7 @@ export function useOfertaById(ofertaId: string) {
         .from("ofertas")
         .select(`
           *,
-          profiles (id, nombre, rol),
+          profiles!productor_id (id, nombre, rol),
           oferta_media (${OFERTA_MEDIA_SELECT})
         `)
         .eq("id", ofertaId)
