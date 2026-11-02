@@ -54,6 +54,54 @@ export function useOfertasActivas(options?: { enabled?: boolean }) {
   });
 }
 
+/** Ofertas de lotes que ya han sido vendidos en el mercado. */
+export function useOfertasVendidas(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ["ofertas_vendidas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ofertas")
+        .select(`
+          *,
+          profiles (id, nombre, rol),
+          oferta_media (${OFERTA_MEDIA_SELECT})
+        `)
+        .eq("estado", "vendida")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return (data ?? []).map(sanitizarOferta);
+    },
+    enabled: (options?.enabled ?? true) && isSupabaseConfigured,
+    retry: isSupabaseConfigured ? 3 : false,
+    refetchInterval: 60000,
+  });
+}
+
+/** Todas las ofertas del mercado (tanto activas como vendidas). */
+export function useOfertasTodas(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ["ofertas_todas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ofertas")
+        .select(`
+          *,
+          profiles (id, nombre, rol),
+          oferta_media (${OFERTA_MEDIA_SELECT})
+        `)
+        .in("estado", ["activa", "vendida"])
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return (data ?? []).map(sanitizarOferta);
+    },
+    enabled: (options?.enabled ?? true) && isSupabaseConfigured,
+    retry: isSupabaseConfigured ? 3 : false,
+    refetchInterval: 60000,
+  });
+}
+
 export function useOfertasPorProductor(productorId: string) {
   return useQuery({
     queryKey: ["ofertas_productor", productorId],

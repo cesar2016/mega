@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "store/authStore";
 import { useAuthRedirect } from "lib/hooks/useAuthRedirect";
+import { useMisOperaciones } from "lib/hooks/useOperaciones";
 import { maskNombreUsuario, showToast } from "lib/utils";
 import { Icon } from "components/ui/Icon";
 import { Avatar } from "components/ui/Avatar";
@@ -58,6 +59,9 @@ export default function PerfilScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { profile, user, updateProfile, signOut } = useAuthStore();
+  const { data: operaciones } = useMisOperaciones(user?.id);
+  const cantVentas = operaciones?.ventas.length ?? 0;
+  const cantCompras = operaciones?.compras.length ?? 0;
 
   const [editing, setEditing] = React.useState(false);
   const [nombre, setNombre] = React.useState(profile?.nombre || "");
@@ -248,7 +252,63 @@ export default function PerfilScreen() {
             </View>
           </Card>
         ) : (
-          <View className="gap-4">
+          <View className="gap-5">
+            {/* Accesos a Mis Ventas y Mis Compras */}
+            <View className="gap-2.5">
+              <Text className="text-xs font-bold uppercase tracking-[0.18em] text-ink-muted">
+                Operaciones Comerciales
+              </Text>
+              <View className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Pressable
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(main)/tabs/ofertas",
+                      params: { tab: "ventas" },
+                    })
+                  }
+                  className="flex-row items-center justify-between rounded-2xl border border-amber-200 bg-amber-50/70 p-4 active:bg-amber-100/70 cursor-pointer shadow-xs"
+                >
+                  <View className="flex-row items-center gap-3">
+                    <View className="h-10 w-10 items-center justify-center rounded-xl bg-amber-100">
+                      <Icon name="tag" size={20} className="text-amber-800" />
+                    </View>
+                    <View>
+                      <Text className="text-sm font-bold text-ink">Mis Ventas</Text>
+                      <Text className="text-xs text-ink-muted">Lotes vendidos y compradores</Text>
+                    </View>
+                  </View>
+                  <View className="flex-row items-center gap-1.5">
+                    <Badge tone="clay">{cantVentas}</Badge>
+                    <Icon name="chevronRight" size={16} className="text-ink-muted" />
+                  </View>
+                </Pressable>
+
+                <Pressable
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(main)/tabs/ofertas",
+                      params: { tab: "compras" },
+                    })
+                  }
+                  className="flex-row items-center justify-between rounded-2xl border border-sage-200 bg-sage-50/70 p-4 active:bg-sage-100/70 cursor-pointer shadow-xs"
+                >
+                  <View className="flex-row items-center gap-3">
+                    <View className="h-10 w-10 items-center justify-center rounded-xl bg-sage-100">
+                      <Icon name="shoppingCart" size={20} className="text-sage-800" />
+                    </View>
+                    <View>
+                      <Text className="text-sm font-bold text-ink">Mis Compras</Text>
+                      <Text className="text-xs text-ink-muted">Lotes adquiridos y productores</Text>
+                    </View>
+                  </View>
+                  <View className="flex-row items-center gap-1.5">
+                    <Badge tone="sage">{cantCompras}</Badge>
+                    <Icon name="chevronRight" size={16} className="text-ink-muted" />
+                  </View>
+                </Pressable>
+              </View>
+            </View>
+
             <View className="gap-3">
               <Text className="text-xs font-bold uppercase tracking-[0.18em] text-ink-muted">
                 Datos de la cuenta

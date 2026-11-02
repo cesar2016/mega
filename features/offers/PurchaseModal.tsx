@@ -197,7 +197,40 @@ export function PurchaseModal({
       // 3. Asegurar que la oferta quede marcada como 'vendida' en la base de datos
       if (isSupabaseConfigured) {
         try {
-          await supabase.from("ofertas").update({ estado: "vendida" }).eq("id", oferta.id);
+          const updateData: Record<string, any> = {
+            estado: "vendida",
+            fecha_venta: new Date().toISOString(),
+          };
+          if (user?.id) {
+            updateData.comprador_id = user.id;
+          }
+          await supabase.from("ofertas").update(updateData).eq("id", oferta.id);
+
+          // Si falló la API serverless, registrar también en operaciones
+          if (!apiExitosa && user?.id && oferta.productor_id) {
+            await supabase.from("operaciones").insert([
+              {
+                oferta_id: oferta.id,
+                vendedor_id: oferta.productor_id,
+                comprador_id: user.id,
+                precio: oferta.precio,
+                tipo_precio: oferta.tipo_precio,
+                cantidad: oferta.cantidad,
+                categoria: oferta.categoria,
+                raza: oferta.raza,
+                localidad: oferta.localidad,
+                provincia: oferta.provincia,
+                comprador_nombre: compradorNombre,
+                comprador_telefono: compradorTelefono,
+                comprador_email: compradorEmail,
+                vendedor_nombre: vendedorObtenido.nombre,
+                vendedor_telefono: vendedorObtenido.telefono,
+                vendedor_email: vendedorObtenido.email,
+                vendedor_establecimiento: vendedorObtenido.establecimiento,
+                estado: "confirmada",
+              },
+            ]);
+          }
         } catch (errUp) {
           console.error("Error al actualizar estado en Supabase:", errUp);
         }
@@ -206,8 +239,11 @@ export function PurchaseModal({
       // 4. Invalidar queries para refrescar la UI inmediatamente
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["ofertas_activas"] }),
+        queryClient.invalidateQueries({ queryKey: ["ofertas_feed"] }),
+        queryClient.invalidateQueries({ queryKey: ["ofertas_vendidas"] }),
         queryClient.invalidateQueries({ queryKey: ["oferta", oferta.id] }),
         queryClient.invalidateQueries({ queryKey: ["ofertas_productor"] }),
+        queryClient.invalidateQueries({ queryKey: ["mis_operaciones"] }),
       ]);
 
       setVendedor(vendedorObtenido);

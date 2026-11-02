@@ -404,29 +404,7 @@ module.exports = async function handler(req, res) {
       vendedorTelefono = "+54 9 11 4000-0000";
     }
 
-    // 3. Marcar la oferta como "vendida" en la base de datos
-    try {
-      const resUpdate = await fetch(`${supabaseUrl}/rest/v1/ofertas?id=eq.${ofertaId}`, {
-        method: "PATCH",
-        headers: {
-          apikey: supabaseServiceKey,
-          Authorization: `Bearer ${supabaseServiceKey}`,
-          "Content-Type": "application/json",
-          Prefer: "return=representation",
-        },
-        body: JSON.stringify({ estado: "vendida" }),
-      });
-      if (!resUpdate.ok) {
-        console.error("Error al marcar oferta como vendida:", await resUpdate.text());
-      } else {
-        console.log(`[comprar] Oferta ${ofertaId} actualizada a estado: vendida`);
-        oferta.estado = "vendida";
-      }
-    } catch (errUpdate) {
-      console.error("Excepción al marcar oferta como vendida:", errUpdate);
-    }
-
-    // 4. Datos del comprador
+    // 3. Datos del comprador y vendedor
     const comprador = {
       id: compradorId || null,
       nombre: compradorNombre || "Comprador",
@@ -443,6 +421,78 @@ module.exports = async function handler(req, res) {
       localidad: oferta.localidad,
       provincia: oferta.provincia,
     };
+
+    // 4. Marcar la oferta como "vendida" y registrar comprador en la base de datos
+    const fechaVenta = new Date().toISOString();
+    try {
+      const updatePayload = {
+        estado: "vendida",
+        fecha_venta: fechaVenta,
+      };
+      if (comprador.id) {
+        updatePayload.comprador_id = comprador.id;
+      }
+
+      const resUpdate = await fetch(`${supabaseUrl}/rest/v1/ofertas?id=eq.${ofertaId}`, {
+        method: "PATCH",
+        headers: {
+          apikey: supabaseServiceKey,
+          Authorization: `Bearer ${supabaseServiceKey}`,
+          "Content-Type": "application/json",
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify(updatePayload),
+      });
+      if (!resUpdate.ok) {
+        console.error("Error al marcar oferta como vendida:", await resUpdate.text());
+      } else {
+        console.log(`[comprar] Oferta ${ofertaId} actualizada a estado: vendida`);
+        oferta.estado = "vendida";
+        oferta.comprador_id = comprador.id;
+        oferta.fecha_venta = fechaVenta;
+      }
+    } catch (errUpdate) {
+      console.error("Excepción al marcar oferta como vendida:", errUpdate);
+    }
+
+    // 4b. Registrar operación en tabla operaciones (Mis ventas / Mis compras)
+    if (comprador.id && oferta.productor_id) {
+      try {
+        await fetch(`${supabaseUrl}/rest/v1/operaciones`, {
+          method: "POST",
+          headers: {
+            apikey: supabaseServiceKey,
+            Authorization: `Bearer ${supabaseServiceKey}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify({
+            oferta_id: oferta.id,
+            vendedor_id: oferta.productor_id,
+            comprador_id: comprador.id,
+            precio: oferta.precio,
+            tipo_precio: oferta.tipo_precio,
+            cantidad: oferta.cantidad,
+            categoria: oferta.categoria,
+            raza: oferta.raza,
+            localidad: oferta.localidad,
+            provincia: oferta.provincia,
+            comprador_nombre: comprador.nombre,
+            comprador_telefono: comprador.telefono,
+            comprador_email: comprador.email,
+            vendedor_nombre: vendedor.nombre,
+            vendedor_telefono: vendedor.telefono,
+            vendedor_email: vendedor.email,
+            vendedor_establecimiento: vendedor.establecimiento,
+            estado: "confirmada",
+            created_at: fechaVenta,
+          }),
+        });
+        console.log(`[comprar] Operación registrada exitosamente en tabla operaciones`);
+      } catch (errOp) {
+        console.error("Error al registrar en tabla operaciones:", errOp);
+      }
+    }
 
     // 5. Enviar emails a ambas partes con Gmail SMTP (o Resend)
     const emailPayload = { vendedor, comprador, oferta };

@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { deleteOferta, useOfertasActivas } from "lib/hooks/useOfferDB";
+import { deleteOferta, useOfertasActivas, useOfertasVendidas } from "lib/hooks/useOfferDB";
 import { isSupabaseConfigured } from "lib/supabase";
 import { useResponsive } from "lib/hooks/useResponsive";
 import { showToast } from "lib/utils";
@@ -25,8 +26,56 @@ export default function FeedScreen() {
 
   const columns = width >= 1280 ? 3 : width >= 640 ? 2 : 1;
 
+  const [tabEstado, setTabEstado] = useState<"activas" | "vendidas" | "todas">("activas");
+
   // El marketplace y galería de publicaciones es público y visible para todos los visitantes
-  const { data: ofertas, isLoading, error, refetch, isRefetching } = useOfertasActivas();
+  const {
+    data: ofertasActivas,
+    isLoading: loadingActivas,
+    error: errorActivas,
+    refetch: refetchActivas,
+    isRefetching: refetchingActivas,
+  } = useOfertasActivas();
+
+  const {
+    data: ofertasVendidas,
+    isLoading: loadingVendidas,
+    error: errorVendidas,
+    refetch: refetchVendidas,
+    isRefetching: refetchingVendidas,
+  } = useOfertasVendidas();
+
+  const refetch = async () => {
+    await Promise.all([refetchActivas(), refetchVendidas()]);
+  };
+  const isRefetching = refetchingActivas || refetchingVendidas;
+  const isLoading = loadingActivas || loadingVendidas;
+  const error = errorActivas || errorVendidas;
+
+  const listaActivas = ((ofertasActivas ?? []) as OfertaResumen[]).slice().sort((a, b) => {
+    const fechaA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const fechaB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return fechaB - fechaA;
+  });
+
+  const listaVendidas = ((ofertasVendidas ?? []) as OfertaResumen[]).slice().sort((a, b) => {
+    const fechaA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const fechaB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return fechaB - fechaA;
+  });
+
+  const listaTodas = [...listaActivas, ...listaVendidas].slice().sort((a, b) => {
+    const fechaA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const fechaB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return fechaB - fechaA;
+  });
+
+  const lista =
+    tabEstado === "activas"
+      ? listaActivas
+      : tabEstado === "vendidas"
+        ? listaVendidas
+        : listaTodas;
 
   const irAPublicar = () => {
     if (!user) {
@@ -48,6 +97,7 @@ export default function FeedScreen() {
       await deleteOferta(oferta.id, urls);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["ofertas_activas"] }),
+        queryClient.invalidateQueries({ queryKey: ["ofertas_vendidas"] }),
         queryClient.invalidateQueries({ queryKey: ["ofertas_productor"] }),
         queryClient.invalidateQueries({ queryKey: ["matches"] }),
         queryClient.invalidateQueries({ queryKey: ["oferta", oferta.id] }),
@@ -80,13 +130,6 @@ export default function FeedScreen() {
       </Screen>
     );
   }
-
-  // Galería de publicaciones ordenada de mayor a menor por fecha (más reciente primero)
-  const lista = ((ofertas ?? []) as OfertaResumen[]).slice().sort((a, b) => {
-    const fechaA = a.created_at ? new Date(a.created_at).getTime() : 0;
-    const fechaB = b.created_at ? new Date(b.created_at).getTime() : 0;
-    return fechaB - fechaA;
-  });
 
   return (
     <View className="flex-1 bg-canvas">
@@ -138,8 +181,20 @@ export default function FeedScreen() {
 
       <Screen
         eyebrow="Mercado Ganadero"
-        title="Lotes disponibles"
-        subtitle="Galería de publicaciones activas en tiempo real. Conectá directo con productores y transportistas."
+        title={
+          tabEstado === "vendidas"
+            ? "Lotes vendidos"
+            : tabEstado === "activas"
+              ? "Lotes disponibles"
+              : "Mercado de hacienda"
+        }
+        subtitle={
+          tabEstado === "vendidas"
+            ? "Historial de publicaciones y lotes comercializados en el mercado ganadero. Referencia de precios y hacienda vendida."
+            : tabEstado === "activas"
+              ? "Galería de publicaciones activas en tiempo real. Conectá directo con productores y transportistas."
+              : "Galería completa de lotes disponibles y comercializados en el mercado ganadero."
+        }
         onRefresh={() => refetch()}
         refreshing={isRefetching}
         action={
@@ -154,22 +209,107 @@ export default function FeedScreen() {
           ) : undefined
         }
       >
+        {/* Selector de Sección: Disponibles / Vendidos / Todos */}
+        <View className="flex-row items-center gap-2 rounded-2xl bg-surface-soft p-1.5 border border-line-soft">
+          <Pressable
+            onPress={() => setTabEstado("activas")}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tabEstado === "activas" }}
+            className={`flex-1 flex-row items-center justify-center gap-2 rounded-xl py-2.5 px-3 transition-all cursor-pointer ${
+              tabEstado === "activas"
+                ? "bg-surface shadow-xs border border-line"
+                : "opacity-70 active:opacity-100"
+            }`}
+          >
+            <View className="h-2 w-2 rounded-full bg-emerald-500" />
+            <Text
+              className={`text-xs font-bold ${
+                tabEstado === "activas" ? "text-ink" : "text-ink-muted"
+              }`}
+            >
+              Disponibles ({listaActivas.length})
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setTabEstado("vendidas")}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tabEstado === "vendidas" }}
+            className={`flex-1 flex-row items-center justify-center gap-2 rounded-xl py-2.5 px-3 transition-all cursor-pointer ${
+              tabEstado === "vendidas"
+                ? "bg-surface shadow-xs border border-line"
+                : "opacity-70 active:opacity-100"
+            }`}
+          >
+            <Icon
+              name="badgeCheck"
+              size={15}
+              className={tabEstado === "vendidas" ? "text-amber-700" : "text-ink-muted"}
+            />
+            <Text
+              className={`text-xs font-bold ${
+                tabEstado === "vendidas" ? "text-amber-800" : "text-ink-muted"
+              }`}
+            >
+              Lotes vendidos ({listaVendidas.length})
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setTabEstado("todas")}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tabEstado === "todas" }}
+            className={`flex-1 flex-row items-center justify-center gap-2 rounded-xl py-2.5 px-3 transition-all cursor-pointer ${
+              tabEstado === "todas"
+                ? "bg-surface shadow-xs border border-line"
+                : "opacity-70 active:opacity-100"
+            }`}
+          >
+            <Icon
+              name="boxes"
+              size={15}
+              className={tabEstado === "todas" ? "text-sage-700" : "text-ink-muted"}
+            />
+            <Text
+              className={`text-xs font-bold ${
+                tabEstado === "todas" ? "text-ink" : "text-ink-muted"
+              }`}
+            >
+              Todos ({listaTodas.length})
+            </Text>
+          </Pressable>
+        </View>
+
         <Gradient
-          colors={["#DCFCE7", "#E0F2FE", "#FDF8F5"]}
+          colors={
+            tabEstado === "vendidas"
+              ? ["#FEF3C7", "#FDE68A", "#FDF8F5"]
+              : ["#DCFCE7", "#E0F2FE", "#FDF8F5"]
+          }
           className="flex-col gap-4 rounded-3xl border border-line-soft px-5 py-5 lg:flex-row lg:items-center lg:justify-between lg:px-7"
         >
           <View className="min-w-0 flex-1 gap-2">
             <View className="flex-row items-center gap-2">
               <View className="h-8 w-8 items-center justify-center rounded-xl bg-surface/80">
-                <Icon name="flame" size={16} className="text-clay-500" />
+                <Icon
+                  name={tabEstado === "vendidas" ? "badgeCheck" : "flame"}
+                  size={16}
+                  className={tabEstado === "vendidas" ? "text-amber-700" : "text-clay-500"}
+                />
               </View>
-              <Text className="text-sm font-bold text-ink">Demanda en vivo</Text>
+              <Text className="text-sm font-bold text-ink">
+                {tabEstado === "vendidas" ? "Operaciones cerradas" : "Demanda en vivo"}
+              </Text>
             </View>
             <Text className="text-2xl font-extrabold tracking-tight text-ink">
-              {lista.length} {lista.length === 1 ? "oferta activa" : "ofertas activas"}
+              {tabEstado === "vendidas"
+                ? `${listaVendidas.length} ${listaVendidas.length === 1 ? "lote vendido" : "lotes vendidos"}`
+                : `${lista.length} ${lista.length === 1 ? "oferta activa" : "ofertas activas"}`}
             </Text>
             <Text className="max-w-2xl text-sm text-ink-soft">
-              El matching automático cruza tu búsqueda con los lotes publicados por productores.
+              {tabEstado === "vendidas"
+                ? "Registro histórico de precios y lotes comercializados exitosamente en la plataforma."
+                : "El matching automático cruza tu búsqueda con los lotes publicados por productores."}
             </Text>
           </View>
 
@@ -180,7 +320,9 @@ export default function FeedScreen() {
             </View>
             <View className="flex-row items-center gap-1.5 rounded-2xl bg-surface/80 px-3 py-2">
               <Icon name="handshake" size={14} className="text-clay-500" />
-              <Text className="text-xs font-semibold text-ink-soft">Match automático</Text>
+              <Text className="text-xs font-semibold text-ink-soft">
+                {tabEstado === "vendidas" ? "Trato directo" : "Match automático"}
+              </Text>
             </View>
           </View>
         </Gradient>
@@ -208,12 +350,20 @@ export default function FeedScreen() {
             description="Configurá EXPO_PUBLIC_SUPABASE_URL y EXPO_PUBLIC_SUPABASE_ANON_KEY en .env para conectar con tu proyecto de Supabase."
           />
         ) : lista.length === 0 ? (
-          <EmptyState
-            icon="inbox"
-            title="Todavía no hay ofertas activas"
-            description="Sé el primero en publicar un lote y aparecé en el mercado."
-            action={<Button label="Publicar oferta" icon="plus" onPress={irAPublicar} />}
-          />
+          tabEstado === "vendidas" ? (
+            <EmptyState
+              icon="badgeCheck"
+              title="No hay lotes vendidos para mostrar"
+              description="A medida que los compradores confirmen compras en el mercado, los lotes vendidos se archivarán en esta sección como referencia histórica de precios."
+            />
+          ) : (
+            <EmptyState
+              icon="inbox"
+              title="Todavía no hay ofertas activas"
+              description="Sé el primero en publicar un lote y aparecé en el mercado."
+              action={<Button label="Publicar oferta" icon="plus" onPress={irAPublicar} />}
+            />
+          )
         ) : (
           <Grid columns={columns}>
             {lista.map((oferta) => {
