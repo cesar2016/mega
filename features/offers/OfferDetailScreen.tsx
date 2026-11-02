@@ -16,7 +16,9 @@ import { MobileTopBar } from "components/layout/MobileTopBar";
 import { StandaloneMobileTabBar } from "components/layout/MobileTabBar";
 import { ShareOfferModal } from "./ShareOfferModal";
 import { PurchaseModal } from "./PurchaseModal";
+import { InteraccionesOfertaModal } from "./InteraccionesOfertaModal";
 import { AuthPromptModal } from "features/auth/AuthPromptModal";
+import { useOfertaInteracciones } from "lib/hooks/useOfertaInteracciones";
 import {
   fotosDe,
   mediaOrdenado,
@@ -157,6 +159,7 @@ function Dato({ icon, label, value }: { icon: "boxes" | "scale" | "calendar" | "
 /** Detalle de una publicación: fotos, video y todos los datos del lote. */
 export default function OfferDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const ofertaIdStr = String(id ?? "");
   const router = useRouter();
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
@@ -166,8 +169,20 @@ export default function OfferDetailScreen() {
   const [eliminando, setEliminando] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const [purchaseModalVisible, setPurchaseModalVisible] = useState(false);
+  const [interaccionesModalVisible, setInteraccionesModalVisible] = useState(false);
+  const [interaccionesTab, setInteraccionesTab] = useState<"likes" | "visitas">("likes");
   const [authModalVisible, setAuthModalVisible] = useState(false);
   const [authModalMotivo, setAuthModalMotivo] = useState<"chat" | "flete" | "comprar">("chat");
+
+  const {
+    likes,
+    likesCount,
+    likedByMe,
+    toggleLike,
+    visitas,
+    visitasCount,
+    registrarVisitaValida,
+  } = useOfertaInteracciones(ofertaIdStr);
 
   const onVolver = () => {
     if (router.canGoBack()) {
@@ -177,7 +192,17 @@ export default function OfferDetailScreen() {
     }
   };
 
-  const { data, isLoading, error } = useOfertaById(String(id ?? ""));
+  const { data, isLoading, error } = useOfertaById(ofertaIdStr);
+
+  // Registrar visita válida solo cuando el visitante permanece más de 30 segundos en la publicación
+  useEffect(() => {
+    if (!ofertaIdStr || !data) return;
+    const timer = setTimeout(() => {
+      registrarVisitaValida(31);
+    }, 30000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ofertaIdStr, Boolean(data), user?.id]);
 
   if (isLoading) {
     return (
@@ -316,7 +341,7 @@ export default function OfferDetailScreen() {
               variant="soft"
               onPress={() => setShareModalVisible(true)}
             />
-            {esPropia ? (
+            {esPropia && !esVendida ? (
               <Button
                 label="Editar"
                 icon="pencil"
@@ -500,6 +525,69 @@ export default function OfferDetailScreen() {
                   </View>
                 ) : null}
               </View>
+
+              {/* Barra interactiva de Me gusta (favorito) y Visitas (+30s) */}
+              <View className="flex-row flex-wrap items-center justify-between gap-2 rounded-2xl border border-line-soft bg-surface/90 px-3.5 py-2.5">
+                <View className="flex-row items-center gap-2">
+                  <Pressable
+                    onPress={toggleLike}
+                    accessibilityRole="button"
+                    accessibilityLabel={likedByMe ? "Quitar Me gusta" : "Dar Me gusta"}
+                    className={[
+                      "flex-row items-center gap-1.5 rounded-xl border px-3 py-1.5 active:opacity-80 cursor-pointer",
+                      likedByMe
+                        ? "border-clay-300 bg-clay-50"
+                        : "border-line-soft bg-surface-soft",
+                    ].join(" ")}
+                  >
+                    <Icon
+                      name="heart"
+                      size={15}
+                      className={likedByMe ? "text-clay-600" : "text-ink-muted"}
+                    />
+                    <Text
+                      className={[
+                        "text-xs font-bold",
+                        likedByMe ? "text-clay-700" : "text-ink",
+                      ].join(" ")}
+                    >
+                      {likedByMe ? "Te gusta" : "Me gusta"}
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => {
+                      setInteraccionesTab("likes");
+                      setInteraccionesModalVisible(true);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Ver listado público de Me gusta"
+                    className="flex-row items-center gap-1 rounded-xl border border-line-soft bg-surface-soft px-2.5 py-1.5 active:bg-surface-sunk cursor-pointer"
+                  >
+                    <Text className="text-xs font-extrabold text-ink">
+                      {likesCount}
+                    </Text>
+                    <Text className="text-xs text-ink-muted">
+                      {likesCount === 1 ? "favorito" : "favoritos"}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                <Pressable
+                  onPress={() => {
+                    setInteraccionesTab("visitas");
+                    setInteraccionesModalVisible(true);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Ver listado público de visitas"
+                  className="flex-row items-center gap-1.5 rounded-xl border border-line-soft bg-surface-soft px-3 py-1.5 active:bg-surface-sunk cursor-pointer"
+                >
+                  <Icon name="eye" size={15} className="text-sage-600" />
+                  <Text className="text-xs font-bold text-ink">
+                    {visitasCount} {visitasCount === 1 ? "visita" : "visitas"}
+                  </Text>
+                </Pressable>
+              </View>
             </Gradient>
 
             <Card className="gap-3">
@@ -527,7 +615,7 @@ export default function OfferDetailScreen() {
               </View>
             </Card>
 
-            {esPropia ? (
+            {esPropia && !esVendida ? (
               <Card className="gap-3 border-sage-200 bg-sage-50/40">
                 <View className="flex-row items-center gap-2">
                   <Icon name="sliders" size={16} className="text-sage-600" />
@@ -587,16 +675,16 @@ export default function OfferDetailScreen() {
               <View className="flex-row items-center gap-3">
                 <Avatar
                   uri={null}
-                  nombre={maskNombreUsuario(oferta.profiles?.nombre, "Usu****", esPropia)}
+                  nombre={maskNombreUsuario(oferta.profiles?.nombre, "Usuario", esPropia)}
                   size={44}
                 />
                 <View className="flex-1 gap-0.5">
                   <Text className="text-sm font-bold text-ink">
-                    {maskNombreUsuario(oferta.profiles?.nombre, "Usu****", esPropia)}
+                    {maskNombreUsuario(oferta.profiles?.nombre, "Usuario", esPropia)}
                   </Text>
                   <Text className="text-xs text-ink-muted">
                     {esPropia
-                      ? `Los demás usuarios te ven como ${maskNombreUsuario(oferta.profiles?.nombre)}`
+                      ? `Nombre público visible en el mercado: ${maskNombreUsuario(oferta.profiles?.nombre)}`
                       : "Usuario verificado · Datos protegidos"}
                   </Text>
                 </View>
@@ -628,7 +716,7 @@ export default function OfferDetailScreen() {
                     </Text>
                   </View>
                   <Text className="text-xs leading-5 text-clay-800">
-                    Esta hacienda ya fue adquirida y la compra confirmada. Ya no está disponible para compra.
+                    Esta hacienda ya fue adquirida y la compra confirmada. Ya no está disponible para compra ni edición.
                   </Text>
                 </View>
               ) : !esPropia ? (
@@ -673,6 +761,15 @@ export default function OfferDetailScreen() {
         onClose={() => setShareModalVisible(false)}
         oferta={oferta}
         portadaUrl={activo?.url ?? portada?.url ?? todos[0]?.url}
+      />
+
+      <InteraccionesOfertaModal
+        visible={interaccionesModalVisible}
+        onClose={() => setInteraccionesModalVisible(false)}
+        initialTab={interaccionesTab}
+        likes={likes}
+        visitas={visitas}
+        tituloOferta={oferta.raza || `Lote de ${oferta.categoria}`}
       />
 
       <AuthPromptModal

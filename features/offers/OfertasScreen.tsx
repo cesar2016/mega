@@ -235,15 +235,19 @@ export default function OfertasScreen() {
             />
           ) : (
             <Grid columns={columns}>
-              {listaPublicaciones.map((oferta) => (
-                <OfferCard
-                  key={oferta.id}
-                  oferta={oferta}
-                  onPress={() => irAlDetalle(oferta.id)}
-                  onEdit={() => irAEditar(oferta.id)}
-                  onDelete={() => handleEliminar(oferta)}
-                />
-              ))}
+              {listaPublicaciones.map((oferta) => {
+                const esVendida =
+                  oferta.estado === "vendida" || oferta.estado === "completada";
+                return (
+                  <OfferCard
+                    key={oferta.id}
+                    oferta={oferta}
+                    onPress={() => irAlDetalle(oferta.id)}
+                    onEdit={!esVendida ? () => irAEditar(oferta.id) : undefined}
+                    onDelete={!esVendida ? () => handleEliminar(oferta) : undefined}
+                  />
+                );
+              })}
             </Grid>
           )
         ) : tabActiva === "ventas" ? (

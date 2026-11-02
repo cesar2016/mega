@@ -323,13 +323,15 @@ export default function FeedScreen() {
           <Grid columns={columns}>
             {lista.map((oferta) => {
               const esPropia = Boolean(profile?.id && oferta.productor_id === profile.id);
+              const esVendida =
+                oferta.estado === "vendida" || oferta.estado === "completada";
               return (
                 <OfferCard
                   key={oferta.id}
                   oferta={oferta}
                   onPress={() => irAlDetalle(oferta.id)}
-                  onEdit={esPropia ? () => irAEditar(oferta.id) : undefined}
-                  onDelete={esPropia ? () => handleEliminar(oferta) : undefined}
+                  onEdit={esPropia && !esVendida ? () => irAEditar(oferta.id) : undefined}
+                  onDelete={esPropia && !esVendida ? () => handleEliminar(oferta) : undefined}
                 />
               );
             })}

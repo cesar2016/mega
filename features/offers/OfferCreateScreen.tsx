@@ -133,6 +133,12 @@ export default function OfferCreateScreen() {
     }
     if (!ofertaExistente || hidratadoRef.current === ofertaExistente.id) return;
 
+    if (ofertaExistente.estado === "vendida" || ofertaExistente.estado === "completada") {
+      showToast("Este lote ya fue vendido y no puede editarse", "error");
+      router.replace(`/(main)/oferta/${ofertaExistente.id}`);
+      return;
+    }
+
     hidratadoRef.current = ofertaExistente.id;
     form.reset({
       categoria: ofertaExistente.categoria ?? "",

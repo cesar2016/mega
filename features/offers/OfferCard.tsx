@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { maskNombreUsuario } from "lib/utils";
+import { useOfertaInteracciones } from "lib/hooks/useOfertaInteracciones";
 import { Icon } from "components/ui/Icon";
 import { Avatar } from "components/ui/Avatar";
 import { Badge, Card } from "components/ui/Card";
@@ -9,6 +10,7 @@ import { MediaCover } from "components/ui/MediaCover";
 import { fotosDe, portadaDe, videosDe } from "components/ui/OfertaMedia";
 import type { OfertaMediaRow } from "components/ui/OfertaMedia";
 import { ShareOfferModal } from "./ShareOfferModal";
+import { InteraccionesOfertaModal } from "./InteraccionesOfertaModal";
 
 export type OfertaResumen = {
   id: string;
@@ -68,7 +70,18 @@ export function OfferCard({
   const [eliminando, setEliminando] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [interaccionesModalVisible, setInteraccionesModalVisible] = useState(false);
+  const [interaccionesTab, setInteraccionesTab] = useState<"likes" | "visitas">("likes");
   const esVendida = oferta.estado === "vendida" || oferta.estado === "completada";
+
+  const {
+    likes,
+    likesCount,
+    likedByMe,
+    toggleLike,
+    visitas,
+    visitasCount,
+  } = useOfertaInteracciones(oferta.id);
 
   const portada = portadaDe(oferta.oferta_media);
   const fotos = fotosDe(oferta.oferta_media).length;
@@ -247,12 +260,77 @@ export function OfferCard({
               ) : null}
             </View>
 
+            {/* Barra de Me gusta (favorito) y Contador de Visitas (+30s) */}
+            <View className="flex-row items-center justify-between gap-2 rounded-2xl border border-line-soft bg-surface-soft/70 px-3 py-2">
+              <View className="flex-row items-center gap-2">
+                <Pressable
+                  onPress={(e) => {
+                    (e as any)?.stopPropagation?.();
+                    toggleLike();
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={likedByMe ? "Quitar Me gusta" : "Dar Me gusta"}
+                  className={[
+                    "flex-row items-center gap-1.5 rounded-xl border px-2.5 py-1.5 active:opacity-80",
+                    likedByMe
+                      ? "border-clay-300 bg-clay-50"
+                      : "border-line-soft bg-surface",
+                  ].join(" ")}
+                >
+                  <Icon
+                    name="heart"
+                    size={14}
+                    className={likedByMe ? "text-clay-600" : "text-ink-muted"}
+                  />
+                  <Text
+                    className={[
+                      "text-xs font-bold",
+                      likedByMe ? "text-clay-700" : "text-ink-soft",
+                    ].join(" ")}
+                  >
+                    Me gusta
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={(e) => {
+                    (e as any)?.stopPropagation?.();
+                    setInteraccionesTab("likes");
+                    setInteraccionesModalVisible(true);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Ver listado de Me gusta"
+                  className="rounded-xl bg-surface px-2.5 py-1.5 border border-line-soft active:bg-surface-sunk"
+                >
+                  <Text className="text-xs font-extrabold text-ink">
+                    {likesCount}
+                  </Text>
+                </Pressable>
+              </View>
+
+              <Pressable
+                onPress={(e) => {
+                  (e as any)?.stopPropagation?.();
+                  setInteraccionesTab("visitas");
+                  setInteraccionesModalVisible(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Ver listado de visitas"
+                className="flex-row items-center gap-1.5 rounded-xl border border-line-soft bg-surface px-2.5 py-1.5 active:bg-surface-sunk"
+              >
+                <Icon name="eye" size={14} className="text-sage-600" />
+                <Text className="text-xs font-bold text-ink-soft">
+                  {visitasCount} {visitasCount === 1 ? "visita" : "visitas"}
+                </Text>
+              </Pressable>
+            </View>
+
             <View className="flex-row items-center gap-2.5 border-t border-line-soft pt-3">
               <Avatar
                 uri={null}
                 nombre={maskNombreUsuario(
                   oferta.profiles?.nombre,
-                  "Usu****",
+                  "Usuario",
                   Boolean(onEdit || onDelete)
                 )}
                 size={32}
@@ -260,7 +338,7 @@ export function OfferCard({
               <Text className="flex-1 text-xs font-medium text-ink-soft" numberOfLines={1}>
                 {maskNombreUsuario(
                   oferta.profiles?.nombre,
-                  "Usu****",
+                  "Usuario",
                   Boolean(onEdit || onDelete)
                 )}
               </Text>
@@ -272,7 +350,7 @@ export function OfferCard({
           </View>
         </Pressable>
 
-        {onEdit || onDelete ? (
+        {(!esVendida && onEdit) || onDelete ? (
           <View className="border-t border-line-soft bg-surface-soft/60 px-5 py-3">
             {confirmando ? (
               <View className="flex-row items-center justify-between gap-2">
@@ -305,7 +383,7 @@ export function OfferCard({
                   onPress={() => setShareModalVisible(true)}
                   className="flex-1"
                 />
-                {onEdit ? (
+                {onEdit && !esVendida ? (
                   <Button
                     label="Editar"
                     icon="pencil"
@@ -315,7 +393,7 @@ export function OfferCard({
                     className="flex-1"
                   />
                 ) : null}
-                {onDelete ? (
+                {onDelete && !esVendida ? (
                   <Button
                     label="Eliminar"
                     icon="trash"
@@ -336,6 +414,15 @@ export function OfferCard({
         onClose={() => setShareModalVisible(false)}
         oferta={oferta}
         portadaUrl={portada?.url}
+      />
+
+      <InteraccionesOfertaModal
+        visible={interaccionesModalVisible}
+        onClose={() => setInteraccionesModalVisible(false)}
+        initialTab={interaccionesTab}
+        likes={likes}
+        visitas={visitas}
+        tituloOferta={oferta.raza || `Lote de ${oferta.categoria}`}
       />
     </View>
   );
