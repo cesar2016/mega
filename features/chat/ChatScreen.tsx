@@ -23,6 +23,7 @@ import { useResponsive } from "lib/hooks/useResponsive";
 import { isSupabaseConfigured } from "lib/supabase";
 import { showToast } from "lib/utils";
 import { useAuthStore } from "store/authStore";
+import { useNotificacionesStore } from "store/notificacionesStore";
 import { useAuthRedirect } from "lib/hooks/useAuthRedirect";
 import { Icon } from "components/ui/Icon";
 import { Avatar, EmptyState } from "components/ui/Avatar";
@@ -200,22 +201,29 @@ export default function ChatScreen() {
     [conversacionActiva, mensajesData]
   );
 
+  const conversacionesVistasMap = useNotificacionesStore(
+    (s) => s.conversacionesVistasMap
+  );
+
   const confirmarLectura = async (convIdExplicito?: string | null) => {
     const id = convIdExplicito ?? conversacionActiva?.id ?? null;
     if (!id || !user?.id) return;
     const conv = conversaciones.find((c) => c.id === id);
-    const haySinLeer =
-      (conv?.no_leidos ?? 0) > 0 ||
-      (id === conversacionActiva?.id &&
-        mensajes.some((m) => m.remitente_id !== user.id && !m.leido_en));
-    if (!haySinLeer) return;
+    const ultimoTs = conv?.ultimo_mensaje?.creado_en || conv?.ultimo_mensaje_en;
 
-    await marcarConversacionLeida(id);
+    await marcarConversacionLeida(id, ultimoTs);
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["conversaciones"] }),
       queryClient.invalidateQueries({ queryKey: ["mensajes", id] }),
     ]);
   };
+
+  useEffect(() => {
+    if (conversacionActiva?.id) {
+      void confirmarLectura(conversacionActiva.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversacionActiva?.id]);
 
   useEffect(() => {
     if (mensajes.length > 0) {
@@ -263,7 +271,7 @@ export default function ChatScreen() {
         remitenteId: user.id,
         cuerpo,
       });
-      await marcarConversacionLeida(convId);
+      await marcarConversacionLeida(convId, new Date().toISOString());
       if (!mensajeExplicito) {
         setTexto("");
       }
@@ -398,7 +406,13 @@ export default function ChatScreen() {
                   {conversaciones.map((conv) => {
                     const activa =
                       !viendoBorrador && conv.id === seleccionadaId;
-                    const sinLeer = conv.no_leidos ?? 0;
+                    const vistoTs = conversacionesVistasMap[conv.id];
+                    const ultimoTs =
+                      conv.ultimo_mensaje?.creado_en || conv.ultimo_mensaje_en;
+                    const yaVisto = Boolean(
+                      vistoTs && (!ultimoTs || vistoTs >= ultimoTs)
+                    );
+                    const sinLeer = yaVisto ? 0 : (conv.no_leidos ?? 0);
                     return (
                       <Pressable
                         key={conv.id}

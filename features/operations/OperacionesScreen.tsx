@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMisOperaciones } from "lib/hooks/useOperaciones";
+import { useMisOperaciones, useOperacionesSinVer } from "lib/hooks/useOperaciones";
 import { useAuthStore } from "store/authStore";
 import { useAuthRedirect } from "lib/hooks/useAuthRedirect";
 import { Icon } from "components/ui/Icon";
@@ -33,6 +33,14 @@ export default function OperacionesScreen() {
   }, [params.tab]);
 
   const { data, isLoading, error, refetch, isRefetching } = useMisOperaciones(user?.id);
+  const {
+    comprasSinVerCount,
+    ventasSinVerCount,
+    totalSinVer,
+    apagarCompras,
+    apagarVentas,
+    apagarTodas,
+  } = useOperacionesSinVer(user?.id);
 
   if (redirect) return redirect;
 
@@ -67,23 +75,30 @@ export default function OperacionesScreen() {
         refreshing={isRefetching}
         action={
           <View className="hidden flex-row items-center gap-2 md:flex">
-            {compras.length > 0 ? (
-              <Badge tone="sage" icon="shoppingCart">
-                {`${compras.length} ${compras.length === 1 ? "Compra concretada" : "Compras concretadas"}`}
-              </Badge>
+            {comprasSinVerCount > 0 ? (
+              <Pressable onPress={apagarCompras} className="cursor-pointer">
+                <Badge tone="sage" icon="shoppingCart">
+                  {`${comprasSinVerCount} ${comprasSinVerCount === 1 ? "Compra nueva" : "Compras nuevas"}`}
+                </Badge>
+              </Pressable>
             ) : null}
-            {ventas.length > 0 ? (
-              <Badge tone="clay" icon="tag">
-                {`${ventas.length} ${ventas.length === 1 ? "Venta concretada" : "Ventas concretadas"}`}
-              </Badge>
+            {ventasSinVerCount > 0 ? (
+              <Pressable onPress={apagarVentas} className="cursor-pointer">
+                <Badge tone="clay" icon="tag">
+                  {`${ventasSinVerCount} ${ventasSinVerCount === 1 ? "Venta nueva" : "Ventas nuevas"}`}
+                </Badge>
+              </Pressable>
             ) : null}
           </View>
         }
       >
-        {/* Resumen superior con Badges de estado */}
+        {/* Resumen superior con Badges que se apagan al hacer click */}
         <View className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Pressable
-            onPress={() => setTab("compras")}
+            onPress={() => {
+              setTab("compras");
+              apagarCompras();
+            }}
             className={[
               "flex-row items-center justify-between rounded-2xl border p-4 cursor-pointer",
               tab === "compras"
@@ -96,19 +111,26 @@ export default function OperacionesScreen() {
                 <Icon name="shoppingCart" size={20} className="text-sage-700" />
               </View>
               <View className="gap-0.5">
-                <Text className="text-sm font-extrabold text-ink">Mis Compras</Text>
+                <Text className="text-sm font-extrabold text-ink">
+                  Mis Compras ({compras.length})
+                </Text>
                 <Text className="text-xs text-ink-muted">
                   Lotes adquiridos y datos del vendedor
                 </Text>
               </View>
             </View>
-            <Badge tone={compras.length > 0 ? "sage" : "neutral"} icon="checkCircle">
-              {`${compras.length}`}
-            </Badge>
+            {comprasSinVerCount > 0 ? (
+              <Badge tone="sage" icon="checkCircle">
+                {`${comprasSinVerCount}`}
+              </Badge>
+            ) : null}
           </Pressable>
 
           <Pressable
-            onPress={() => setTab("ventas")}
+            onPress={() => {
+              setTab("ventas");
+              apagarVentas();
+            }}
             className={[
               "flex-row items-center justify-between rounded-2xl border p-4 cursor-pointer",
               tab === "ventas"
@@ -121,22 +143,29 @@ export default function OperacionesScreen() {
                 <Icon name="tag" size={20} className="text-amber-800" />
               </View>
               <View className="gap-0.5">
-                <Text className="text-sm font-extrabold text-ink">Mis Ventas</Text>
+                <Text className="text-sm font-extrabold text-ink">
+                  Mis Ventas ({ventas.length})
+                </Text>
                 <Text className="text-xs text-ink-muted">
                   Lotes vendidos y datos del comprador
                 </Text>
               </View>
             </View>
-            <Badge tone={ventas.length > 0 ? "clay" : "neutral"} icon="checkCircle">
-              {`${ventas.length}`}
-            </Badge>
+            {ventasSinVerCount > 0 ? (
+              <Badge tone="clay" icon="checkCircle">
+                {`${ventasSinVerCount}`}
+              </Badge>
+            ) : null}
           </Pressable>
         </View>
 
-        {/* Selector de pestañas con Badges */}
+        {/* Selector de pestañas con Badges que se apagan al hacer click */}
         <View className="flex-row items-center gap-2 rounded-2xl border border-line-soft bg-surface-soft p-1.5">
           <Pressable
-            onPress={() => setTab("compras")}
+            onPress={() => {
+              setTab("compras");
+              apagarCompras();
+            }}
             accessibilityRole="tab"
             accessibilityState={{ selected: tab === "compras" }}
             className={[
@@ -154,17 +183,18 @@ export default function OperacionesScreen() {
                 tab === "compras" ? "text-sage-800" : "text-ink-muted"
               }`}
             >
-              Mis Compras
+              Mis Compras ({compras.length})
             </Text>
-            {compras.length > 0 ? (
-              <Badge tone="sage">{compras.length}</Badge>
-            ) : (
-              <Text className="text-xs font-semibold text-ink-muted">(0)</Text>
-            )}
+            {comprasSinVerCount > 0 ? (
+              <Badge tone="sage">{comprasSinVerCount}</Badge>
+            ) : null}
           </Pressable>
 
           <Pressable
-            onPress={() => setTab("ventas")}
+            onPress={() => {
+              setTab("ventas");
+              apagarVentas();
+            }}
             accessibilityRole="tab"
             accessibilityState={{ selected: tab === "ventas" }}
             className={[
@@ -182,17 +212,18 @@ export default function OperacionesScreen() {
                 tab === "ventas" ? "text-amber-800" : "text-ink-muted"
               }`}
             >
-              Mis Ventas
+              Mis Ventas ({ventas.length})
             </Text>
-            {ventas.length > 0 ? (
-              <Badge tone="clay">{ventas.length}</Badge>
-            ) : (
-              <Text className="text-xs font-semibold text-ink-muted">(0)</Text>
-            )}
+            {ventasSinVerCount > 0 ? (
+              <Badge tone="clay">{ventasSinVerCount}</Badge>
+            ) : null}
           </Pressable>
 
           <Pressable
-            onPress={() => setTab("todas")}
+            onPress={() => {
+              setTab("todas");
+              apagarTodas();
+            }}
             accessibilityRole="tab"
             accessibilityState={{ selected: tab === "todas" }}
             className={[
@@ -210,13 +241,11 @@ export default function OperacionesScreen() {
                 tab === "todas" ? "text-ink" : "text-ink-muted"
               }`}
             >
-              Todas
+              Todas ({todas.length})
             </Text>
-            {todas.length > 0 ? (
-              <Badge tone="wheat">{todas.length}</Badge>
-            ) : (
-              <Text className="text-xs font-semibold text-ink-muted">(0)</Text>
-            )}
+            {totalSinVer > 0 ? (
+              <Badge tone="wheat">{totalSinVer}</Badge>
+            ) : null}
           </Pressable>
         </View>
 

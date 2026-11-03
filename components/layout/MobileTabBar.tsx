@@ -3,9 +3,10 @@ import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useAuthStore } from "store/authStore";
-import { usePendientesMatch } from "lib/hooks/useMatches";
-import { useMensajesSinLeer } from "lib/hooks/useChat";
-import { useMisOperaciones } from "lib/hooks/useOperaciones";
+import { useMatches, usePendientesMatch } from "lib/hooks/useMatches";
+import { marcarConversacionLeida, useConversaciones, useMensajesSinLeer } from "lib/hooks/useChat";
+import { useOperacionesSinVer } from "lib/hooks/useOperaciones";
+import { useNotificacionesStore } from "store/notificacionesStore";
 import { Icon } from "components/ui/Icon";
 import { NAV_ITEMS } from "./navItems";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
@@ -18,6 +19,14 @@ export function MobileTabBar({ state, descriptors, navigation }: BottomTabBarPro
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
+  const profile = useAuthStore((state) => state.profile);
+  const { data: matchesData } = useMatches({ enabled: !!profile });
+  const { data: convsData } = useConversaciones({ enabled: !!profile });
+  const { apagarTodas: apagarOperaciones } = useOperacionesSinVer(profile?.id);
+  const marcarMatchesVistos = useNotificacionesStore((s) => s.marcarMatchesVistos);
+  const marcarTodasConversacionesVistas = useNotificacionesStore(
+    (s) => s.marcarTodasConversacionesVistas
+  );
 
   return (
     <View
@@ -52,6 +61,23 @@ export function MobileTabBar({ state, descriptors, navigation }: BottomTabBarPro
                   params: { mode: "login", returnUrl: `/(main)/tabs/${route.name}` },
                 });
                 return;
+              }
+
+              // Apagar badge inmediatamente al hacer click
+              if (route.name === "matches") {
+                marcarMatchesVistos((matchesData ?? []).map((m) => m.id));
+              } else if (route.name === "chat") {
+                marcarTodasConversacionesVistas(convsData ?? []);
+                for (const c of convsData ?? []) {
+                  if ((c.no_leidos ?? 0) > 0) {
+                    void marcarConversacionLeida(
+                      c.id,
+                      c.ultimo_mensaje?.creado_en || c.ultimo_mensaje_en
+                    );
+                  }
+                }
+              } else if (route.name === "operaciones" || route.name === "ofertas") {
+                apagarOperaciones();
               }
 
               const event = navigation.emit({
@@ -119,10 +145,16 @@ export function StandaloneMobileTabBar({
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const profile = useAuthStore((state) => state.profile);
+  const { data: matchesData } = useMatches({ enabled: !!profile });
   const pendientes = usePendientesMatch({ enabled: !!profile });
+  const { data: convsData } = useConversaciones({ enabled: !!profile });
   const mensajesSinLeer = useMensajesSinLeer({ enabled: !!profile });
-  const { data: misOperaciones } = useMisOperaciones(profile?.id);
-  const totalOperaciones = misOperaciones?.todas.length ?? 0;
+  const { totalSinVer: totalOperaciones, apagarTodas: apagarOperaciones } =
+    useOperacionesSinVer(profile?.id);
+  const marcarMatchesVistos = useNotificacionesStore((s) => s.marcarMatchesVistos);
+  const marcarTodasConversacionesVistas = useNotificacionesStore(
+    (s) => s.marcarTodasConversacionesVistas
+  );
 
   return (
     <View
@@ -162,6 +194,23 @@ export function StandaloneMobileTabBar({
                   params: { mode: "login", returnUrl: item.href as string },
                 });
                 return;
+              }
+
+              // Apagar el badge de aviso inmediatamente al hacer click
+              if (item.name === "matches") {
+                marcarMatchesVistos((matchesData ?? []).map((m) => m.id));
+              } else if (item.name === "chat") {
+                marcarTodasConversacionesVistas(convsData ?? []);
+                for (const c of convsData ?? []) {
+                  if ((c.no_leidos ?? 0) > 0) {
+                    void marcarConversacionLeida(
+                      c.id,
+                      c.ultimo_mensaje?.creado_en || c.ultimo_mensaje_en
+                    );
+                  }
+                }
+              } else if (item.name === "operaciones" || item.name === "ofertas") {
+                apagarOperaciones();
               }
 
               router.push(item.href);

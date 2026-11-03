@@ -15,6 +15,12 @@ import { Gradient, Screen } from "components/ui/Screen";
 import { MobileTopBar } from "components/layout/MobileTopBar";
 import { OfferCard } from "features/offers/OfferCard";
 import type { OfertaResumen } from "features/offers/OfferCard";
+import {
+  FILTROS_OFERTA_INICIAL,
+  OfertasFilterBar,
+  filtrarOfertas,
+} from "components/filters/OfertasFilterBar";
+import type { FiltrosOfertaState } from "components/filters/OfertasFilterBar";
 
 export default function FeedScreen() {
   const router = useRouter();
@@ -26,6 +32,7 @@ export default function FeedScreen() {
   const columns = width >= 1280 ? 3 : width >= 640 ? 2 : 1;
 
   const [tabEstado, setTabEstado] = useState<"activas" | "vendidas" | "todas">("activas");
+  const [filtros, setFiltros] = useState<FiltrosOfertaState>(FILTROS_OFERTA_INICIAL);
 
   // El marketplace y galería de publicaciones es público y visible para todos los visitantes
   const {
@@ -69,12 +76,14 @@ export default function FeedScreen() {
     return fechaB - fechaA;
   });
 
-  const lista =
+  const listaBase =
     tabEstado === "activas"
       ? listaActivas
       : tabEstado === "vendidas"
         ? listaVendidas
         : listaTodas;
+
+  const lista = filtrarOfertas(listaBase, filtros, profile);
 
   const irAPublicar = () => {
     if (!user) {
@@ -234,6 +243,13 @@ export default function FeedScreen() {
             </Text>
           </Pressable>
         </View>
+
+        <OfertasFilterBar
+          filtros={filtros}
+          onChange={setFiltros}
+          totalResultados={lista.length}
+          totalSinFiltrar={listaBase.length}
+        />
 
         <Gradient
           colors={

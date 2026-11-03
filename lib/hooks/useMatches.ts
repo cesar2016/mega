@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, isSupabaseConfigured } from "lib/supabase";
 import { OFERTA_MEDIA_SELECT } from "lib/hooks/useOfferDB";
 import { maskNombreUsuario } from "lib/utils";
+import { useNotificacionesStore } from "store/notificacionesStore";
 import type { DemandaMatch, OfertaMatch } from "lib/matching";
 
 export type EstadoMatch = "pendiente" | "aceptado" | "rechazado" | "finalizado";
@@ -119,8 +120,12 @@ export async function actualizarEstadoMatch(id: string, estado: EstadoMatch) {
   if (error) throw error;
 }
 
-/** Cuántos cruces tiene el usuario sin responder (para el badge de navegación). */
+/** Cuántos cruces nuevos tiene el usuario sin ver (se apaga al hacer click). */
 export function usePendientesMatch(options?: { enabled?: boolean }) {
   const { data } = useMatches(options);
-  return (data ?? []).filter((match) => match.estado === "pendiente").length;
+  const matchesVistosIds = useNotificacionesStore((s) => s.matchesVistosIds);
+  return (data ?? []).filter(
+    (match) => match.estado === "pendiente" && !matchesVistosIds.includes(match.id)
+  ).length;
 }
+

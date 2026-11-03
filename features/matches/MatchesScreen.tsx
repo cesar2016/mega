@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -8,6 +8,7 @@ import { useResponsive } from "lib/hooks/useResponsive";
 import { isSupabaseConfigured } from "lib/supabase";
 import { showToast } from "lib/utils";
 import { useAuthStore } from "store/authStore";
+import { useNotificacionesStore } from "store/notificacionesStore";
 import { useAuthRedirect } from "lib/hooks/useAuthRedirect";
 import { Icon } from "components/ui/Icon";
 import { EmptyState } from "components/ui/Avatar";
@@ -66,6 +67,7 @@ export default function MatchesScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const profile = useAuthStore((state) => state.profile);
+  const marcarMatchesVistos = useNotificacionesStore((s) => s.marcarMatchesVistos);
   const { width } = useResponsive();
   const columns = width >= 1280 ? 3 : width >= 768 ? 2 : 1;
 
@@ -77,6 +79,12 @@ export default function MatchesScreen() {
   });
 
   const matches = useMemo(() => (data ?? []) as MatchRow[], [data]);
+
+  useEffect(() => {
+    if (matches.length > 0) {
+      marcarMatchesVistos(matches.map((m) => m.id));
+    }
+  }, [matches, marcarMatchesVistos]);
 
   const visibles = useMemo(
     () => (filtro === "todos" ? matches : matches.filter((m) => m.estado === filtro)),

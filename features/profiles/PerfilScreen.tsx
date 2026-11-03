@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase, isSupabaseConfigured } from "lib/supabase";
 import { useAuthStore, UserRol } from "store/authStore";
 import { useAuthRedirect } from "lib/hooks/useAuthRedirect";
-import { useMisOperaciones } from "lib/hooks/useOperaciones";
+import { useMisOperaciones, useOperacionesSinVer } from "lib/hooks/useOperaciones";
 import {
   formatCuit,
   isValidCuitFormat,
@@ -68,6 +68,12 @@ export default function PerfilScreen() {
   const queryClient = useQueryClient();
   const { profile, user, updateProfile, fetchProfile, signOut } = useAuthStore();
   const { data: operaciones } = useMisOperaciones(user?.id);
+  const {
+    comprasSinVerCount,
+    ventasSinVerCount,
+    apagarCompras,
+    apagarVentas,
+  } = useOperacionesSinVer(user?.id);
   const cantVentas = operaciones?.ventas.length ?? 0;
   const cantCompras = operaciones?.compras.length ?? 0;
 
@@ -508,12 +514,13 @@ export default function PerfilScreen() {
               </Text>
               <View className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Pressable
-                  onPress={() =>
+                  onPress={() => {
+                    apagarVentas();
                     router.push({
                       pathname: "/(main)/tabs/operaciones",
                       params: { tab: "ventas" },
-                    })
-                  }
+                    });
+                  }}
                   className="flex-row items-center justify-between rounded-2xl border border-amber-200 bg-amber-50/70 p-4 active:bg-amber-100/70 cursor-pointer shadow-xs"
                 >
                   <View className="flex-row items-center gap-3">
@@ -522,10 +529,12 @@ export default function PerfilScreen() {
                     </View>
                     <View className="gap-0.5">
                       <View className="flex-row items-center gap-2">
-                        <Text className="text-sm font-bold text-ink">Mis Ventas</Text>
-                        {cantVentas > 0 ? (
+                        <Text className="text-sm font-bold text-ink">
+                          Mis Ventas ({cantVentas})
+                        </Text>
+                        {ventasSinVerCount > 0 ? (
                           <Badge tone="clay" icon="badgeCheck">
-                            {cantVentas} {cantVentas === 1 ? "concretada" : "concretadas"}
+                            {ventasSinVerCount} {ventasSinVerCount === 1 ? "nueva" : "nuevas"}
                           </Badge>
                         ) : null}
                       </View>
@@ -533,18 +542,21 @@ export default function PerfilScreen() {
                     </View>
                   </View>
                   <View className="flex-row items-center gap-1.5">
-                    <Badge tone="clay">{cantVentas}</Badge>
+                    {ventasSinVerCount > 0 ? (
+                      <Badge tone="clay">{ventasSinVerCount}</Badge>
+                    ) : null}
                     <Icon name="chevronRight" size={16} className="text-ink-muted" />
                   </View>
                 </Pressable>
 
                 <Pressable
-                  onPress={() =>
+                  onPress={() => {
+                    apagarCompras();
                     router.push({
                       pathname: "/(main)/tabs/operaciones",
                       params: { tab: "compras" },
-                    })
-                  }
+                    });
+                  }}
                   className="flex-row items-center justify-between rounded-2xl border border-sage-200 bg-sage-50/70 p-4 active:bg-sage-100/70 cursor-pointer shadow-xs"
                 >
                   <View className="flex-row items-center gap-3">
@@ -553,10 +565,12 @@ export default function PerfilScreen() {
                     </View>
                     <View className="gap-0.5">
                       <View className="flex-row items-center gap-2">
-                        <Text className="text-sm font-bold text-ink">Mis Compras</Text>
-                        {cantCompras > 0 ? (
+                        <Text className="text-sm font-bold text-ink">
+                          Mis Compras ({cantCompras})
+                        </Text>
+                        {comprasSinVerCount > 0 ? (
                           <Badge tone="sage" icon="badgeCheck">
-                            {cantCompras} {cantCompras === 1 ? "concretada" : "concretadas"}
+                            {comprasSinVerCount} {comprasSinVerCount === 1 ? "nueva" : "nuevas"}
                           </Badge>
                         ) : null}
                       </View>
@@ -564,7 +578,9 @@ export default function PerfilScreen() {
                     </View>
                   </View>
                   <View className="flex-row items-center gap-1.5">
-                    <Badge tone="sage">{cantCompras}</Badge>
+                    {comprasSinVerCount > 0 ? (
+                      <Badge tone="sage">{comprasSinVerCount}</Badge>
+                    ) : null}
                     <Icon name="chevronRight" size={16} className="text-ink-muted" />
                   </View>
                 </Pressable>

@@ -3,7 +3,7 @@ import { Tabs } from "expo-router";
 import { useResponsive } from "lib/hooks/useResponsive";
 import { usePendientesMatch } from "lib/hooks/useMatches";
 import { useMensajesSinLeer } from "lib/hooks/useChat";
-import { useMisOperaciones } from "lib/hooks/useOperaciones";
+import { useOperacionesSinVer } from "lib/hooks/useOperaciones";
 import { useAuthStore } from "store/authStore";
 import { MobileTabBar } from "components/layout/MobileTabBar";
 import { Icon } from "components/ui/Icon";
@@ -14,8 +14,7 @@ export default function TabsLayout() {
   const profile = useAuthStore((state) => state.profile);
   const pendientes = usePendientesMatch({ enabled: !!profile });
   const mensajesSinLeer = useMensajesSinLeer({ enabled: !!profile });
-  const { data: misOperaciones } = useMisOperaciones(profile?.id);
-  const totalOperaciones = misOperaciones?.todas.length ?? 0;
+  const { totalSinVer: totalOperaciones } = useOperacionesSinVer(profile?.id);
 
   return (
     <Tabs

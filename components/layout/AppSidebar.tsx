@@ -4,9 +4,10 @@ import { usePathname, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "store/authStore";
 import { showToast } from "lib/utils";
-import { usePendientesMatch } from "lib/hooks/useMatches";
-import { useMensajesSinLeer } from "lib/hooks/useChat";
-import { useMisOperaciones } from "lib/hooks/useOperaciones";
+import { useMatches, usePendientesMatch } from "lib/hooks/useMatches";
+import { marcarConversacionLeida, useConversaciones, useMensajesSinLeer } from "lib/hooks/useChat";
+import { useOperacionesSinVer } from "lib/hooks/useOperaciones";
+import { useNotificacionesStore } from "store/notificacionesStore";
 import { Icon } from "components/ui/Icon";
 import { Avatar } from "components/ui/Avatar";
 import { Logo } from "components/ui/Logo";
@@ -31,10 +32,16 @@ export function AppSidebar() {
   const signOut = useAuthStore((state) => state.signOut);
 
   const activo = activeNavItem(pathname);
+  const { data: matchesData } = useMatches({ enabled: !!profile });
   const pendientes = usePendientesMatch({ enabled: !!profile });
+  const { data: convsData } = useConversaciones({ enabled: !!profile });
   const mensajesSinLeer = useMensajesSinLeer({ enabled: !!profile });
-  const { data: misOperaciones } = useMisOperaciones(profile?.id);
-  const totalOperaciones = misOperaciones?.todas.length ?? 0;
+  const { totalSinVer: totalOperaciones, apagarTodas: apagarOperaciones } =
+    useOperacionesSinVer(profile?.id);
+  const marcarMatchesVistos = useNotificacionesStore((s) => s.marcarMatchesVistos);
+  const marcarTodasConversacionesVistas = useNotificacionesStore(
+    (s) => s.marcarTodasConversacionesVistas
+  );
 
   return (
     <View className="h-full w-[264px] shrink-0 border-r border-line-soft bg-surface px-4 py-6">
@@ -77,6 +84,24 @@ export function AppSidebar() {
                   });
                   return;
                 }
+
+                // Apagar el badge de aviso inmediatamente al hacer click
+                if (item.name === "matches") {
+                  marcarMatchesVistos((matchesData ?? []).map((m) => m.id));
+                } else if (item.name === "chat") {
+                  marcarTodasConversacionesVistas(convsData ?? []);
+                  for (const c of convsData ?? []) {
+                    if ((c.no_leidos ?? 0) > 0) {
+                      void marcarConversacionLeida(
+                        c.id,
+                        c.ultimo_mensaje?.creado_en || c.ultimo_mensaje_en
+                      );
+                    }
+                  }
+                } else if (item.name === "operaciones" || item.name === "ofertas") {
+                  apagarOperaciones();
+                }
+
                 router.push(item.href);
               }}
               className={[

@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { deleteOferta, useOfertasPorProductor } from "lib/hooks/useOfferDB";
-import { useMisOperaciones } from "lib/hooks/useOperaciones";
+import { useMisOperaciones, useOperacionesSinVer } from "lib/hooks/useOperaciones";
 import { useResponsive } from "lib/hooks/useResponsive";
 import { showToast } from "lib/utils";
 import { useAuthStore } from "store/authStore";
@@ -18,6 +18,12 @@ import { MobileTopBar } from "components/layout/MobileTopBar";
 import { OfferCard } from "features/offers/OfferCard";
 import type { OfertaResumen } from "features/offers/OfferCard";
 import { OperacionCard } from "features/operations/OperacionCard";
+import {
+  FILTROS_OFERTA_INICIAL,
+  OfertasFilterBar,
+  filtrarOfertas,
+} from "components/filters/OfertasFilterBar";
+import type { FiltrosOfertaState } from "components/filters/OfertasFilterBar";
 
 type TabTipo = "publicaciones" | "ventas" | "compras";
 
@@ -33,6 +39,7 @@ export default function OfertasScreen() {
   const searchParams = useLocalSearchParams<{ tab?: string }>();
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
+  const profile = useAuthStore((state) => state.profile);
   const { width } = useResponsive();
 
   const [tabActiva, setTabActiva] = useState<TabTipo>(
@@ -40,6 +47,7 @@ export default function OfertasScreen() {
       ? (searchParams.tab as TabTipo)
       : "publicaciones"
   );
+  const [filtros, setFiltros] = useState<FiltrosOfertaState>(FILTROS_OFERTA_INICIAL);
 
   useEffect(() => {
     if (searchParams.tab === "ventas" || searchParams.tab === "compras" || searchParams.tab === "publicaciones") {
@@ -66,6 +74,13 @@ export default function OfertasScreen() {
     refetch: refetchOperaciones,
     isRefetching: refetchingOperaciones,
   } = useMisOperaciones(user?.id);
+
+  const {
+    comprasSinVerCount,
+    ventasSinVerCount,
+    apagarCompras,
+    apagarVentas,
+  } = useOperacionesSinVer(user?.id);
 
   if (redirect) return redirect;
 
@@ -108,7 +123,8 @@ export default function OfertasScreen() {
     );
   }
 
-  const listaPublicaciones = (dataOfertas ?? []) as OfertaResumen[];
+  const listaPublicacionesBase = (dataOfertas ?? []) as OfertaResumen[];
+  const listaPublicaciones = filtrarOfertas(listaPublicacionesBase, filtros, profile);
   const listaVentas = dataOperaciones?.ventas ?? [];
   const listaCompras = dataOperaciones?.compras ?? [];
 
@@ -165,12 +181,15 @@ export default function OfertasScreen() {
                 tabActiva === "publicaciones" ? "text-ink" : "text-ink-muted"
               }`}
             >
-              Publicaciones ({listaPublicaciones.length})
+              Publicaciones ({listaPublicacionesBase.length})
             </Text>
           </Pressable>
 
           <Pressable
-            onPress={() => setTabActiva("ventas")}
+            onPress={() => {
+              setTabActiva("ventas");
+              apagarVentas();
+            }}
             accessibilityRole="tab"
             accessibilityState={{ selected: tabActiva === "ventas" }}
             className={`flex-1 flex-row items-center justify-center gap-1.5 sm:gap-2 rounded-xl py-2.5 px-2.5 sm:px-3 transition-all cursor-pointer ${
@@ -189,15 +208,18 @@ export default function OfertasScreen() {
                 tabActiva === "ventas" ? "text-amber-800" : "text-ink-muted"
               }`}
             >
-              Mis ventas
+              Mis ventas ({listaVentas.length})
             </Text>
-            <Badge tone={listaVentas.length > 0 ? "clay" : "neutral"}>
-              {listaVentas.length}
-            </Badge>
+            {ventasSinVerCount > 0 ? (
+              <Badge tone="clay">{ventasSinVerCount}</Badge>
+            ) : null}
           </Pressable>
 
           <Pressable
-            onPress={() => setTabActiva("compras")}
+            onPress={() => {
+              setTabActiva("compras");
+              apagarCompras();
+            }}
             accessibilityRole="tab"
             accessibilityState={{ selected: tabActiva === "compras" }}
             className={`flex-1 flex-row items-center justify-center gap-1.5 sm:gap-2 rounded-xl py-2.5 px-2.5 sm:px-3 transition-all cursor-pointer ${
@@ -216,13 +238,22 @@ export default function OfertasScreen() {
                 tabActiva === "compras" ? "text-sage-800" : "text-ink-muted"
               }`}
             >
-              Mis compras
+              Mis compras ({listaCompras.length})
             </Text>
-            <Badge tone={listaCompras.length > 0 ? "sage" : "neutral"}>
-              {listaCompras.length}
-            </Badge>
+            {comprasSinVerCount > 0 ? (
+              <Badge tone="sage">{comprasSinVerCount}</Badge>
+            ) : null}
           </Pressable>
         </View>
+
+        {tabActiva === "publicaciones" && listaPublicacionesBase.length > 0 ? (
+          <OfertasFilterBar
+            filtros={filtros}
+            onChange={setFiltros}
+            totalResultados={listaPublicaciones.length}
+            totalSinFiltrar={listaPublicacionesBase.length}
+          />
+        ) : null}
 
         {error ? (
           <EmptyState

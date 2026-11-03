@@ -4,6 +4,7 @@ import { supabase, isSupabaseConfigured } from "lib/supabase";
 import { detectarDatosContacto } from "lib/contactFilter";
 import { maskNombreUsuario, showToast } from "lib/utils";
 import { useAuthStore } from "store/authStore";
+import { useNotificacionesStore } from "store/notificacionesStore";
 
 export type MensajeRow = {
   id: string;
@@ -278,20 +279,41 @@ export function useConversaciones(options?: { enabled?: boolean }) {
 
 /**
  * Total de mensajes sin leer en todas las conversaciones del usuario actual
- * (para el badge de notificación en la barra de navegación).
+ * (se apaga inmediatamente cuando el usuario hace click en la conversación o en Chat).
  */
 export function useMensajesSinLeer(options?: { enabled?: boolean }): number {
   const { data } = useConversaciones(options);
-  return (data ?? []).reduce((total, conv) => total + (conv.no_leidos ?? 0), 0);
+  const conversacionesVistasMap = useNotificacionesStore(
+    (s) => s.conversacionesVistasMap
+  );
+
+  return (data ?? []).reduce((total, conv) => {
+    const sinLeerDb = conv.no_leidos ?? 0;
+    if (sinLeerDb <= 0) return total;
+
+    const vistoTs = conversacionesVistasMap[conv.id];
+    const ultimoTs = conv.ultimo_mensaje?.creado_en || conv.ultimo_mensaje_en;
+    if (vistoTs && (!ultimoTs || vistoTs >= ultimoTs)) {
+      return total;
+    }
+    return total + sinLeerDb;
+  }, 0);
 }
 
 /**
- * Marca como leídos todos los mensajes recibidos de la contraparte en una conversación.
+ * Marca como leídos todos los mensajes recibidos de la contraparte en una conversación
+ * y apaga inmediatamente el badge local.
  */
 export async function marcarConversacionLeida(
-  conversacionId: string
+  conversacionId: string,
+  ultimoMensajeEn?: string | null
 ): Promise<void> {
-  if (!isSupabaseConfigured || !conversacionId) return;
+  if (!conversacionId) return;
+  useNotificacionesStore
+    .getState()
+    .marcarConversacionVista(conversacionId, ultimoMensajeEn);
+
+  if (!isSupabaseConfigured) return;
   const { error } = await supabase.rpc("marcar_mensajes_leidos", {
     p_conversacion_id: conversacionId,
   });

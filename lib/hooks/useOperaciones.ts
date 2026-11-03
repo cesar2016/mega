@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase, isSupabaseConfigured } from "lib/supabase";
+import { useNotificacionesStore } from "store/notificacionesStore";
 import type { OfertaMediaRow } from "components/ui/OfertaMedia";
 import { OFERTA_MEDIA_SELECT } from "./useOfferDB";
 
@@ -82,3 +83,32 @@ export function useMisOperaciones(userId?: string) {
     refetchInterval: 30000,
   });
 }
+
+/**
+ * Devuelve las operaciones sin ver (para los badges de aviso) y las funciones
+ * para apagar el badge inmediatamente al hacer click.
+ */
+export function useOperacionesSinVer(userId?: string) {
+  const { data } = useMisOperaciones(userId);
+  const operacionesVistasIds = useNotificacionesStore((s) => s.operacionesVistasIds);
+  const marcarOperacionesVistas = useNotificacionesStore((s) => s.marcarOperacionesVistas);
+
+  const todas = data?.todas ?? [];
+  const compras = data?.compras ?? [];
+  const ventas = data?.ventas ?? [];
+
+  const comprasSinVer = compras.filter((op) => !operacionesVistasIds.includes(op.id));
+  const ventasSinVer = ventas.filter((op) => !operacionesVistasIds.includes(op.id));
+  const todasSinVer = todas.filter((op) => !operacionesVistasIds.includes(op.id));
+
+  return {
+    totalSinVer: todasSinVer.length,
+    comprasSinVerCount: comprasSinVer.length,
+    ventasSinVerCount: ventasSinVer.length,
+    apagarTodas: () => marcarOperacionesVistas(todas.map((op) => op.id)),
+    apagarCompras: () => marcarOperacionesVistas(compras.map((op) => op.id)),
+    apagarVentas: () => marcarOperacionesVistas(ventas.map((op) => op.id)),
+    apagarOperacion: (id: string) => marcarOperacionesVistas([id]),
+  };
+}
+
