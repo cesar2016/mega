@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { useAuthStore } from "store/authStore";
 import { usePendientesMatch } from "lib/hooks/useMatches";
 import { useMensajesSinLeer } from "lib/hooks/useChat";
+import { useMisOperaciones } from "lib/hooks/useOperaciones";
 import { Icon } from "components/ui/Icon";
 import { NAV_ITEMS } from "./navItems";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
@@ -120,6 +121,8 @@ export function StandaloneMobileTabBar({
   const profile = useAuthStore((state) => state.profile);
   const pendientes = usePendientesMatch({ enabled: !!profile });
   const mensajesSinLeer = useMensajesSinLeer({ enabled: !!profile });
+  const { data: misOperaciones } = useMisOperaciones(profile?.id);
+  const totalOperaciones = misOperaciones?.todas.length ?? 0;
 
   return (
     <View
@@ -135,7 +138,11 @@ export function StandaloneMobileTabBar({
               ? mensajesSinLeer > 99
                 ? "99+"
                 : mensajesSinLeer
-              : undefined;
+              : item.name === "operaciones" && totalOperaciones > 0
+                ? totalOperaciones > 99
+                  ? "99+"
+                  : totalOperaciones
+                : undefined;
 
         return (
           <Pressable

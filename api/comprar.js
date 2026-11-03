@@ -147,17 +147,27 @@ function generarHtmlEmailVendedor({ vendedor, comprador, oferta, usaCid = false 
 }
 
 /**
- * Proveedor 1: Gmail SMTP vía Nodemailer
+ * Proveedor 1: Gmail SMTP vía Nodemailer (mganadero.ok@gmail.com)
  */
-function getGmailTransporter() {
+const DEFAULT_SMTP_USER = "mganadero.ok@gmail.com";
+const DEFAULT_SMTP_PASS = "ylof usrx bkke ormm";
+
+function getGmailTransporter(useDefaultFallback = false) {
   if (!nodemailer) return null;
 
-  const user = process.env.GMAIL_USER || process.env.SMTP_USER || process.env.MAIL_USERNAME;
-  const pass =
-    process.env.GMAIL_APP_PASSWORD ||
-    process.env.SMTP_PASS ||
-    process.env.SMTP_PASSWORD ||
-    process.env.MAIL_PASSWORD;
+  const user = useDefaultFallback
+    ? DEFAULT_SMTP_USER
+    : process.env.GMAIL_USER ||
+      process.env.SMTP_USER ||
+      process.env.MAIL_USERNAME ||
+      DEFAULT_SMTP_USER;
+  const pass = useDefaultFallback
+    ? DEFAULT_SMTP_PASS
+    : process.env.GMAIL_APP_PASSWORD ||
+      process.env.SMTP_PASS ||
+      process.env.SMTP_PASSWORD ||
+      process.env.MAIL_PASSWORD ||
+      DEFAULT_SMTP_PASS;
   const host = process.env.SMTP_HOST || "smtp.gmail.com";
   const port = Number(process.env.SMTP_PORT || 465);
 
@@ -171,7 +181,7 @@ function getGmailTransporter() {
     secure: port === 465,
     auth: {
       user: user.trim(),
-      pass: pass.trim().replace(/\s+/g, ""), // Limpiar posibles espacios de app passwords
+      pass: pass.trim().replace(/\s+/g, ""), // Limpiar espacios de la clave de aplicación
     },
   });
 }
@@ -226,26 +236,34 @@ async function enviarEmailResend({ to, subject, html }) {
 }
 
 /**
- * Orquestador de envío de correo (Intenta Gmail SMTP primero, luego Resend)
+ * Orquestador de envío de correo (Intenta Gmail SMTP mganadero.ok@gmail.com primero, luego Resend)
  */
 async function despacharEmail({ to, subject, htmlGenerator, payload }) {
-  // 1. Probar primero con Gmail SMTP
-  const transporter = getGmailTransporter();
-  if (transporter) {
-    const fromUser = process.env.GMAIL_USER || process.env.SMTP_USER || process.env.MAIL_USERNAME;
-    const from = process.env.GMAIL_FROM || process.env.SMTP_FROM || `Mercado Ganadero <${fromUser}>`;
+  const attachments = [];
+  const logoPath = path.join(process.cwd(), "public", "logo.png");
+  if (fs.existsSync(logoPath)) {
+    attachments.push({
+      filename: "logo.png",
+      path: logoPath,
+      cid: "logo_emblema",
+    });
+  }
 
-    const attachments = [];
-    const logoPath = path.join(process.cwd(), "public", "logo.png");
-    if (fs.existsSync(logoPath)) {
-      attachments.push({
-        filename: "logo.png",
-        path: logoPath,
-        cid: "logo_emblema",
-      });
-    }
+  const html = htmlGenerator({ ...payload, usaCid: attachments.length > 0 });
 
-    const html = htmlGenerator({ ...payload, usaCid: attachments.length > 0 });
+  // 1. Probar con Gmail SMTP (variables de entorno o mganadero.ok@gmail.com)
+  for (const useFallback of [false, true]) {
+    const transporter = getGmailTransporter(useFallback);
+    if (!transporter) continue;
+
+    const fromUser = useFallback
+      ? DEFAULT_SMTP_USER
+      : process.env.GMAIL_USER ||
+        process.env.SMTP_USER ||
+        process.env.MAIL_USERNAME ||
+        DEFAULT_SMTP_USER;
+    const from =
+      process.env.GMAIL_FROM || process.env.SMTP_FROM || `Mercado Ganadero <${fromUser}>`;
 
     try {
       const info = await transporter.sendMail({
@@ -255,25 +273,28 @@ async function despacharEmail({ to, subject, htmlGenerator, payload }) {
         html,
         attachments,
       });
-      console.log(`[comprar] Email enviado exitosamente a ${to} vía Gmail SMTP (${info.messageId})`);
+      console.log(
+        `[comprar] Email enviado exitosamente a ${to} vía Gmail SMTP (${info.messageId})`
+      );
       return { ok: true, provider: "gmail_smtp", messageId: info.messageId };
     } catch (err) {
-      console.error("[comprar] Error al despachar con Gmail SMTP:", err.message);
-      // Fall through a Resend si hay error o si no funcionó
+      console.error(
+        `[comprar] Error al despachar con Gmail SMTP (fallback=${useFallback}):`,
+        err.message
+      );
     }
   }
 
-  // 2. Si no hay Gmail SMTP o falló, probar con Resend
+  // 2. Si falló Gmail SMTP y existe RESEND_API_KEY, probar con Resend
   if (process.env.RESEND_API_KEY) {
-    const html = htmlGenerator({ ...payload, usaCid: false });
-    return await enviarEmailResend({ to, subject, html });
+    const htmlSinCid = htmlGenerator({ ...payload, usaCid: false });
+    return await enviarEmailResend({ to, subject, html: htmlSinCid });
   }
 
-  console.warn("[comprar] No se detectó configuración de Gmail SMTP (GMAIL_USER / GMAIL_APP_PASSWORD) ni RESEND_API_KEY.");
   return {
     ok: false,
-    sinConfig: true,
-    error: "Configurá GMAIL_USER y GMAIL_APP_PASSWORD en Vercel para activar los correos automáticos.",
+    sinConfig: false,
+    error: "No se pudo enviar el correo mediante SMTP.",
   };
 }
 
@@ -344,7 +365,7 @@ module.exports = async function handler(req, res) {
     if (oferta.productor_id) {
       // Buscar perfil
       const resPerfil = await fetch(
-        `${supabaseUrl}/rest/v1/profiles?id=eq.${oferta.productor_id}&select=id,nombre,telefono`,
+        `${supabaseUrl}/rest/v1/profiles?id=eq.${oferta.productor_id}&select=id,nombre,nombre_completo,telefono,establecimiento`,
         {
           headers: {
             apikey: supabaseServiceKey,
@@ -354,27 +375,31 @@ module.exports = async function handler(req, res) {
       );
       const perfiles = await resPerfil.json();
       if (Array.isArray(perfiles) && perfiles.length > 0) {
-        vendedorNombre = perfiles[0].nombre || vendedorNombre;
+        vendedorNombre =
+          perfiles[0].nombre_completo || perfiles[0].nombre || vendedorNombre;
         vendedorTelefono = perfiles[0].telefono || null;
+        vendedorEstablecimiento = perfiles[0].establecimiento || null;
       }
 
       // Buscar datos de productor (establecimiento)
-      try {
-        const resProd = await fetch(
-          `${supabaseUrl}/rest/v1/productores?user_id=eq.${oferta.productor_id}&select=establecimiento,cuit`,
-          {
-            headers: {
-              apikey: supabaseServiceKey,
-              Authorization: `Bearer ${supabaseServiceKey}`,
-            },
+      if (!vendedorEstablecimiento) {
+        try {
+          const resProd = await fetch(
+            `${supabaseUrl}/rest/v1/productores?user_id=eq.${oferta.productor_id}&select=establecimiento,cuit`,
+            {
+              headers: {
+                apikey: supabaseServiceKey,
+                Authorization: `Bearer ${supabaseServiceKey}`,
+              },
+            }
+          );
+          const productores = await resProd.json();
+          if (Array.isArray(productores) && productores.length > 0) {
+            vendedorEstablecimiento = productores[0].establecimiento || null;
           }
-        );
-        const productores = await resProd.json();
-        if (Array.isArray(productores) && productores.length > 0) {
-          vendedorEstablecimiento = productores[0].establecimiento || null;
+        } catch {
+          // Ignorar si no existe tabla o registro
         }
-      } catch {
-        // Ignorar si no existe tabla o registro
       }
 
       // Obtener el email del productor de auth.users con service_role
@@ -398,18 +423,71 @@ module.exports = async function handler(req, res) {
     }
 
     if (!vendedorEmail) {
-      vendedorEmail = "contacto@mercadoganadero.app";
+      vendedorEmail = DEFAULT_SMTP_USER;
     }
     if (!vendedorTelefono) {
-      vendedorTelefono = "+54 9 11 4000-0000";
+      vendedorTelefono = "Sin informar";
+    }
+
+    // 2b. Completar datos del comprador desde profiles / auth.users si faltaran
+    let compNombreFinal = (compradorNombre || "").trim();
+    let compTelefonoFinal = (compradorTelefono || "").trim();
+    let compEmailFinal = (compradorEmail || "").trim();
+
+    if (compradorId) {
+      if (!compNombreFinal || !compTelefonoFinal) {
+        try {
+          const resCompPerfil = await fetch(
+            `${supabaseUrl}/rest/v1/profiles?id=eq.${compradorId}&select=nombre,nombre_completo,telefono`,
+            {
+              headers: {
+                apikey: supabaseServiceKey,
+                Authorization: `Bearer ${supabaseServiceKey}`,
+              },
+            }
+          );
+          const compPerfiles = await resCompPerfil.json();
+          if (Array.isArray(compPerfiles) && compPerfiles.length > 0) {
+            if (!compNombreFinal) {
+              compNombreFinal =
+                compPerfiles[0].nombre_completo || compPerfiles[0].nombre || "";
+            }
+            if (!compTelefonoFinal) {
+              compTelefonoFinal = compPerfiles[0].telefono || "";
+            }
+          }
+        } catch {
+          // Ignorar
+        }
+      }
+
+      if (!compEmailFinal) {
+        try {
+          const resCompUser = await fetch(
+            `${supabaseUrl}/auth/v1/admin/users/${compradorId}`,
+            {
+              headers: {
+                apikey: supabaseServiceKey,
+                Authorization: `Bearer ${supabaseServiceKey}`,
+              },
+            }
+          );
+          if (resCompUser.ok) {
+            const compUserData = await resCompUser.json();
+            compEmailFinal = compUserData?.email || "";
+          }
+        } catch (e) {
+          console.error("Error al obtener email del comprador:", e);
+        }
+      }
     }
 
     // 3. Datos del comprador y vendedor
     const comprador = {
       id: compradorId || null,
-      nombre: compradorNombre || "Comprador",
-      telefono: compradorTelefono || "No especificado",
-      email: compradorEmail || "comprador@mercadoganadero.app",
+      nombre: compNombreFinal || "Comprador",
+      telefono: compTelefonoFinal || "No especificado",
+      email: compEmailFinal || "",
     };
 
     const vendedor = {
@@ -559,11 +637,8 @@ module.exports = async function handler(req, res) {
     }
 
     const algunEmailEnviado = Boolean(emailCompradorRes.ok || emailVendedorRes.ok);
-    const tieneConfiguracion = Boolean(
-      (process.env.GMAIL_USER || process.env.SMTP_USER || process.env.MAIL_USERNAME) &&
-      (process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || process.env.SMTP_PASSWORD || process.env.MAIL_PASSWORD)
-    ) || Boolean(process.env.RESEND_API_KEY);
-    const sinConfiguracion = !tieneConfiguracion || Boolean(emailCompradorRes.sinConfig || emailVendedorRes.sinConfig);
+    const tieneConfiguracion = Boolean(DEFAULT_SMTP_USER && DEFAULT_SMTP_PASS);
+    const sinConfiguracion = !tieneConfiguracion && !algunEmailEnviado;
 
     return res.status(200).json({
       success: true,

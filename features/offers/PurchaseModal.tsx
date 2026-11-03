@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Icon } from "components/ui/Icon";
 import { Button } from "components/ui/Button";
@@ -72,6 +73,7 @@ export function PurchaseModal({
   user,
   profile,
 }: PurchaseModalProps) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [phase, setPhase] = useState<"confirm" | "success">("confirm");
   const [loading, setLoading] = useState(false);
@@ -98,7 +100,12 @@ export function PurchaseModal({
       return;
     }
 
-    const compradorNombre = (profile?.nombre || user?.email?.split("@")[0] || "Comprador").trim();
+    const compradorNombre = (
+      profile?.nombre_completo ||
+      profile?.nombre ||
+      user?.email?.split("@")[0] ||
+      "Comprador"
+    ).trim();
     const compradorTelefono = (profile?.telefono || "").trim();
     const compradorEmail = (user?.email || "").trim();
 
@@ -605,13 +612,28 @@ export function PurchaseModal({
                   </View>
                 </View>
 
-                {/* Botón de cierre */}
-                <Button
-                  label="Entendido, volver a la publicación"
-                  variant="primary"
-                  size="lg"
-                  onPress={onClose}
-                />
+                {/* Botones de cierre y acceso a Mis Compras */}
+                <View className="gap-2.5">
+                  <Button
+                    label="Ir a Mis Compras / Mis Ventas"
+                    icon="shoppingCart"
+                    variant="primary"
+                    size="lg"
+                    onPress={() => {
+                      onClose();
+                      router.push({
+                        pathname: "/(main)/tabs/operaciones",
+                        params: { tab: "compras" },
+                      });
+                    }}
+                  />
+                  <Button
+                    label="Volver a la publicación"
+                    variant="secondary"
+                    size="md"
+                    onPress={onClose}
+                  />
+                </View>
               </>
             )}
           </ScrollView>

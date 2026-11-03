@@ -10,7 +10,7 @@ import { useAuthStore } from "store/authStore";
 import { useAuthRedirect } from "lib/hooks/useAuthRedirect";
 import { Icon } from "components/ui/Icon";
 import { EmptyState } from "components/ui/Avatar";
-import { Card } from "components/ui/Card";
+import { Badge, Card } from "components/ui/Card";
 import { Button } from "components/ui/Button";
 import { Grid } from "components/ui/Grid";
 import { Screen } from "components/ui/Screen";
@@ -189,8 +189,11 @@ export default function OfertasScreen() {
                 tabActiva === "ventas" ? "text-amber-800" : "text-ink-muted"
               }`}
             >
-              Mis ventas ({listaVentas.length})
+              Mis ventas
             </Text>
+            <Badge tone={listaVentas.length > 0 ? "clay" : "neutral"}>
+              {listaVentas.length}
+            </Badge>
           </Pressable>
 
           <Pressable
@@ -213,8 +216,11 @@ export default function OfertasScreen() {
                 tabActiva === "compras" ? "text-sage-800" : "text-ink-muted"
               }`}
             >
-              Mis compras ({listaCompras.length})
+              Mis compras
             </Text>
+            <Badge tone={listaCompras.length > 0 ? "sage" : "neutral"}>
+              {listaCompras.length}
+            </Badge>
           </Pressable>
         </View>
 

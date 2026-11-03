@@ -14,6 +14,12 @@ export const NAV_ITEMS: NavItem[] = [
   { name: "feed", href: "/", title: "Ofertas", icon: "store" },
   { name: "matches", href: "/(main)/tabs/matches", title: "Matches", icon: "sparkles" },
   { name: "ofertas", href: "/(main)/tabs/ofertas", title: "Mis ofertas", icon: "boxes" },
+  {
+    name: "operaciones",
+    href: "/(main)/tabs/operaciones",
+    title: "Compras / Ventas",
+    icon: "shoppingCart",
+  },
   { name: "demandas", href: "/(main)/tabs/demandas", title: "Demandas", icon: "search" },
   { name: "chat", href: "/(main)/tabs/chat", title: "Chat", icon: "message" },
   { name: "perfil", href: "/(main)/tabs/perfil", title: "Perfil", icon: "user" },

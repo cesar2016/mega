@@ -6,6 +6,7 @@ import { useAuthStore } from "store/authStore";
 import { showToast } from "lib/utils";
 import { usePendientesMatch } from "lib/hooks/useMatches";
 import { useMensajesSinLeer } from "lib/hooks/useChat";
+import { useMisOperaciones } from "lib/hooks/useOperaciones";
 import { Icon } from "components/ui/Icon";
 import { Avatar } from "components/ui/Avatar";
 import { Logo } from "components/ui/Logo";
@@ -32,6 +33,8 @@ export function AppSidebar() {
   const activo = activeNavItem(pathname);
   const pendientes = usePendientesMatch({ enabled: !!profile });
   const mensajesSinLeer = useMensajesSinLeer({ enabled: !!profile });
+  const { data: misOperaciones } = useMisOperaciones(profile?.id);
+  const totalOperaciones = misOperaciones?.todas.length ?? 0;
 
   return (
     <View className="h-full w-[264px] shrink-0 border-r border-line-soft bg-surface px-4 py-6">
@@ -58,7 +61,9 @@ export function AppSidebar() {
               ? pendientes
               : item.name === "chat"
                 ? mensajesSinLeer
-                : 0;
+                : item.name === "operaciones"
+                  ? totalOperaciones
+                  : 0;
 
           return (
             <Pressable

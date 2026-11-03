@@ -510,7 +510,7 @@ export default function PerfilScreen() {
                 <Pressable
                   onPress={() =>
                     router.push({
-                      pathname: "/(main)/tabs/ofertas",
+                      pathname: "/(main)/tabs/operaciones",
                       params: { tab: "ventas" },
                     })
                   }
@@ -520,8 +520,15 @@ export default function PerfilScreen() {
                     <View className="h-10 w-10 items-center justify-center rounded-xl bg-amber-100">
                       <Icon name="tag" size={20} className="text-amber-800" />
                     </View>
-                    <View>
-                      <Text className="text-sm font-bold text-ink">Mis Ventas</Text>
+                    <View className="gap-0.5">
+                      <View className="flex-row items-center gap-2">
+                        <Text className="text-sm font-bold text-ink">Mis Ventas</Text>
+                        {cantVentas > 0 ? (
+                          <Badge tone="clay" icon="badgeCheck">
+                            {cantVentas} {cantVentas === 1 ? "concretada" : "concretadas"}
+                          </Badge>
+                        ) : null}
+                      </View>
                       <Text className="text-xs text-ink-muted">Lotes vendidos y compradores</Text>
                     </View>
                   </View>
@@ -534,7 +541,7 @@ export default function PerfilScreen() {
                 <Pressable
                   onPress={() =>
                     router.push({
-                      pathname: "/(main)/tabs/ofertas",
+                      pathname: "/(main)/tabs/operaciones",
                       params: { tab: "compras" },
                     })
                   }
@@ -544,8 +551,15 @@ export default function PerfilScreen() {
                     <View className="h-10 w-10 items-center justify-center rounded-xl bg-sage-100">
                       <Icon name="shoppingCart" size={20} className="text-sage-800" />
                     </View>
-                    <View>
-                      <Text className="text-sm font-bold text-ink">Mis Compras</Text>
+                    <View className="gap-0.5">
+                      <View className="flex-row items-center gap-2">
+                        <Text className="text-sm font-bold text-ink">Mis Compras</Text>
+                        {cantCompras > 0 ? (
+                          <Badge tone="sage" icon="badgeCheck">
+                            {cantCompras} {cantCompras === 1 ? "concretada" : "concretadas"}
+                          </Badge>
+                        ) : null}
+                      </View>
                       <Text className="text-xs text-ink-muted">Lotes adquiridos y productores</Text>
                     </View>
                   </View>
