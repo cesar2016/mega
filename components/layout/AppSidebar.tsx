@@ -7,17 +7,18 @@ import { showToast } from "lib/utils";
 import { useMatches, usePendientesMatch } from "lib/hooks/useMatches";
 import { marcarConversacionLeida, useConversaciones, useMensajesSinLeer } from "lib/hooks/useChat";
 import { useOperacionesSinVer } from "lib/hooks/useOperaciones";
+import { isSuperAdmin } from "lib/superAdmin";
 import { useNotificacionesStore } from "store/notificacionesStore";
 import { Icon } from "components/ui/Icon";
 import { Avatar } from "components/ui/Avatar";
 import { Logo } from "components/ui/Logo";
-import { NAV_ITEMS, activeNavItem } from "./navItems";
+import { activeNavItem, getVisibleNavItems } from "./navItems";
 
 const ROLE_LABEL: Record<string, string> = {
   productor: "Compra y venta",
   comprador: "Compra y venta",
   fletero: "Transportista",
-  admin: "Administrador",
+  admin: "SuperAdmin",
 };
 
 /**
@@ -28,9 +29,12 @@ export function AppSidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const queryClient = useQueryClient();
+  const user = useAuthStore((state) => state.user);
   const profile = useAuthStore((state) => state.profile);
   const signOut = useAuthStore((state) => state.signOut);
 
+  const esAdmin = isSuperAdmin(profile, user);
+  const itemsVisibles = getVisibleNavItems(esAdmin);
   const activo = activeNavItem(pathname);
   const { data: matchesData } = useMatches({ enabled: !!profile });
   const pendientes = usePendientesMatch({ enabled: !!profile });
@@ -61,7 +65,7 @@ export function AppSidebar() {
 
       {/* Navegación */}
       <View className="gap-1">
-        {NAV_ITEMS.map((item) => {
+        {itemsVisibles.map((item) => {
           const focused = activo?.name === item.name;
           const badge =
             item.name === "matches"

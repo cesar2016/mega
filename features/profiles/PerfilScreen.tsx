@@ -6,6 +6,7 @@ import { supabase, isSupabaseConfigured } from "lib/supabase";
 import { useAuthStore, UserRol } from "store/authStore";
 import { useAuthRedirect } from "lib/hooks/useAuthRedirect";
 import { useMisOperaciones, useOperacionesSinVer } from "lib/hooks/useOperaciones";
+import { isSuperAdmin } from "lib/superAdmin";
 import {
   formatCuit,
   isValidCuitFormat,
@@ -507,6 +508,31 @@ export default function PerfilScreen() {
           </Card>
         ) : (
           <View className="gap-5">
+            {isSuperAdmin(profile, user) ? (
+              <Pressable
+                onPress={() => router.push("/(main)/tabs/superadmin")}
+                className="flex-row items-center justify-between rounded-2xl border border-clay-300 bg-clay-50 p-4 active:bg-clay-100 cursor-pointer shadow-xs"
+              >
+                <View className="flex-row items-center gap-3">
+                  <View className="h-11 w-11 items-center justify-center rounded-xl bg-clay-500">
+                    <Icon name="shield" size={20} className="text-white" />
+                  </View>
+                  <View className="gap-0.5">
+                    <View className="flex-row items-center gap-2">
+                      <Text className="text-sm font-extrabold text-ink">
+                        Panel de Control SuperAdmin
+                      </Text>
+                      <Badge tone="clay">Exclusivo Mega.Oficial_1</Badge>
+                    </View>
+                    <Text className="text-xs text-ink-muted">
+                      Usuarios registrados, visitas al sitio, visitas repetidas y ubicaciones de origen
+                    </Text>
+                  </View>
+                </View>
+                <Icon name="chevronRight" size={18} className="text-clay-600" />
+              </Pressable>
+            ) : null}
+
             {/* Accesos a Mis Ventas y Mis Compras */}
             <View className="gap-2.5">
               <Text className="text-xs font-bold uppercase tracking-[0.18em] text-ink-muted">

@@ -6,9 +6,10 @@ import { useAuthStore } from "store/authStore";
 import { useMatches, usePendientesMatch } from "lib/hooks/useMatches";
 import { marcarConversacionLeida, useConversaciones, useMensajesSinLeer } from "lib/hooks/useChat";
 import { useOperacionesSinVer } from "lib/hooks/useOperaciones";
+import { isSuperAdmin } from "lib/superAdmin";
 import { useNotificacionesStore } from "store/notificacionesStore";
 import { Icon } from "components/ui/Icon";
-import { NAV_ITEMS } from "./navItems";
+import { getVisibleNavItems } from "./navItems";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 
 /**
@@ -20,6 +21,7 @@ export function MobileTabBar({ state, descriptors, navigation }: BottomTabBarPro
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const profile = useAuthStore((state) => state.profile);
+  const esAdmin = isSuperAdmin(profile, user);
   const { data: matchesData } = useMatches({ enabled: !!profile });
   const { data: convsData } = useConversaciones({ enabled: !!profile });
   const { apagarTodas: apagarOperaciones } = useOperacionesSinVer(profile?.id);
@@ -34,6 +36,9 @@ export function MobileTabBar({ state, descriptors, navigation }: BottomTabBarPro
       style={{ paddingBottom: Math.max(insets.bottom, 8) }}
     >
       {state.routes.map((route, index) => {
+        if (route.name === "superadmin" && !esAdmin) {
+          return null;
+        }
         const { options } = descriptors[route.key];
         const label =
           typeof options.tabBarLabel === "string"
@@ -145,6 +150,8 @@ export function StandaloneMobileTabBar({
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const profile = useAuthStore((state) => state.profile);
+  const esAdmin = isSuperAdmin(profile, user);
+  const itemsVisibles = getVisibleNavItems(esAdmin);
   const { data: matchesData } = useMatches({ enabled: !!profile });
   const pendientes = usePendientesMatch({ enabled: !!profile });
   const { data: convsData } = useConversaciones({ enabled: !!profile });
@@ -161,7 +168,7 @@ export function StandaloneMobileTabBar({
       className="flex-row items-stretch border-t border-line-soft bg-surface px-2 pt-1.5 md:hidden"
       style={{ paddingBottom: Math.max(insets.bottom, 8) }}
     >
-      {NAV_ITEMS.map((item) => {
+      {itemsVisibles.map((item) => {
         const focused = item.name === activeTab;
         const badge =
           item.name === "matches" && pendientes > 0

@@ -5,6 +5,7 @@ import { View } from "react-native";
 import { Stack } from "expo-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { supabase, isSupabaseConfigured } from "lib/supabase";
+import { useRegistrarVisitaSitio } from "lib/superAdmin";
 import { useAuthStore } from "store/authStore";
 import { ToastHost } from "components/ui/Toast";
 
@@ -16,6 +17,10 @@ const DEMO_USER = {
 export default function RootLayout() {
   const [queryClient] = useState(() => new QueryClient());
   const setUser = useAuthStore((state) => state.setUser);
+  const user = useAuthStore((state) => state.user);
+  const profile = useAuthStore((state) => state.profile);
+
+  useRegistrarVisitaSitio(user, profile);
 
   useEffect(() => {
     let cancelled = false;
