@@ -8,6 +8,7 @@ import { supabase, isSupabaseConfigured } from "lib/supabase";
 import { registerPwaServiceWorker } from "lib/pwa";
 import { useRegistrarVisitaSitio } from "lib/superAdmin";
 import { useAuthStore } from "store/authStore";
+import { PwaInstallSheet } from "components/pwa/InstallAppButton";
 import { ToastHost } from "components/ui/Toast";
 
 const DEMO_USER = {
@@ -65,6 +66,7 @@ export default function RootLayout() {
           <Stack.Screen name="(main)" />
           <Stack.Screen name="+not-found" />
         </Stack>
+        <PwaInstallSheet />
         <ToastHost />
       </View>
     </QueryClientProvider>

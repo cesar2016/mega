@@ -1,18 +1,22 @@
-import React, { useState } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
-import { usePwaInstall } from "lib/pwa";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Modal, Pressable, Text, View } from "react-native";
+import { shouldAutoShowPwaSheet, usePwaInstall } from "lib/pwa";
 import { showToast } from "lib/utils";
 import { Icon } from "components/ui/Icon";
-import { Logo } from "components/ui/Logo";
 
+/**
+ * Botón en la barra superior (móvil) o barra lateral (escritorio):
+ * Si el navegador ya tiene listo el instalador nativo, lo lanza directo en 1 toque;
+ * si no, abre el cuadro inferior de instalación directa ("Guardá Mercado Ganadero en tu celular").
+ */
 export function InstallAppButton({
   variant = "compact",
 }: {
   variant?: "compact" | "sidebar";
 }) {
-  const { isWeb, isInstalled, canPromptNatively, isIos, triggerNativePrompt } =
+  const { isWeb, isInstalled, canPromptNatively, triggerNativePrompt, openSheet } =
     usePwaInstall();
-  const [modalVisible, setModalVisible] = useState(false);
+  const [instalando, setInstalando] = useState(false);
 
   if (!isWeb || isInstalled) {
     return null;
@@ -20,144 +24,225 @@ export function InstallAppButton({
 
   const handlePress = async () => {
     if (canPromptNatively) {
-      const result = await triggerNativePrompt();
-      if (result === "accepted") {
-        showToast("¡Aplicación instalada en tu pantalla de inicio!", "success");
+      setInstalando(true);
+      const res = await triggerNativePrompt();
+      setInstalando(false);
+      if (res === "accepted") {
+        showToast("¡Acceso directo instalado en tu celular!", "success");
         return;
       }
-      if (result === "dismissed") {
+      if (res === "dismissed") {
         return;
       }
     }
-    setModalVisible(true);
+    openSheet();
+  };
+
+  if (variant === "sidebar") {
+    return (
+      <Pressable
+        onPress={handlePress}
+        disabled={instalando}
+        accessibilityRole="button"
+        accessibilityLabel="Instalar acceso directo en el celular"
+        className="mb-2.5 flex-row items-center justify-center gap-2 rounded-2xl border border-sage-600 bg-sage-50 px-4 py-2.5 active:bg-sage-100 cursor-pointer"
+      >
+        {instalando ? (
+          <ActivityIndicator size="small" className="text-sage-700" />
+        ) : (
+          <Icon name="plus" size={16} className="text-sage-700" />
+        )}
+        <Text className="text-xs font-extrabold text-sage-800">
+          Instalar acceso directo
+        </Text>
+      </Pressable>
+    );
+  }
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      disabled={instalando}
+      accessibilityRole="button"
+      accessibilityLabel="Instalar acceso directo en mi celular"
+      className="flex-row items-center gap-1.5 rounded-xl border border-sage-600 bg-sage-600 px-2.5 py-1.5 active:bg-sage-700 cursor-pointer"
+    >
+      {instalando ? (
+        <ActivityIndicator size="small" color="#FFFFFF" />
+      ) : (
+        <Icon name="plus" size={13} className="text-white" />
+      )}
+      <Text className="text-[11px] font-extrabold text-white">
+        Instalar App
+      </Text>
+    </Pressable>
+  );
+}
+
+/**
+ * Cuadro inferior estilo Bottom Sheet (idéntico al diseño de la Imagen 2):
+ * - "Guardá Mercado Ganadero en tu celular"
+ * - "Accedé rápidamente a los lotes y ofertas desde tu teléfono."
+ * - [ Instalar acceso directo > ]
+ * - [ Lo haré más adelante ]
+ * - "No volver a mostrar"
+ */
+export function PwaInstallSheet() {
+  const {
+    isWeb,
+    isInstalled,
+    isIos,
+    sheetOpenManual,
+    triggerNativePrompt,
+    closeSheet,
+  } = usePwaInstall();
+
+  const [autoVisible, setAutoVisible] = useState(false);
+  const [instalando, setInstalando] = useState(false);
+  const [mostrarAyudaFallback, setMostrarAyudaFallback] = useState(false);
+
+  useEffect(() => {
+    if (!isWeb || isInstalled) return;
+    const timer = setTimeout(() => {
+      if (shouldAutoShowPwaSheet()) {
+        setAutoVisible(true);
+      }
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [isWeb, isInstalled]);
+
+  if (!isWeb || isInstalled) {
+    return null;
+  }
+
+  const visible = sheetOpenManual || autoVisible;
+  if (!visible) {
+    return null;
+  }
+
+  const handleCloseLater = () => {
+    setAutoVisible(false);
+    setMostrarAyudaFallback(false);
+    closeSheet("later");
+  };
+
+  const handleNeverShowAgain = () => {
+    setAutoVisible(false);
+    setMostrarAyudaFallback(false);
+    closeSheet("never");
+  };
+
+  const handleInstallClick = async () => {
+    setInstalando(true);
+    const outcome = await triggerNativePrompt();
+    setInstalando(false);
+
+    if (outcome === "accepted") {
+      setAutoVisible(false);
+      setMostrarAyudaFallback(false);
+      closeSheet("never");
+      showToast("¡Acceso directo instalado en tu celular!", "success");
+      return;
+    }
+
+    if (outcome === "dismissed") {
+      handleCloseLater();
+      return;
+    }
+
+    // Si el navegador aún no habilitó el disparo automático (ej. Safari en iOS o ya instalada)
+    setMostrarAyudaFallback(true);
   };
 
   return (
-    <>
-      {variant === "sidebar" ? (
-        <Pressable
-          onPress={handlePress}
-          accessibilityRole="button"
-          accessibilityLabel="Instalar aplicación en el dispositivo"
-          className="mb-2.5 flex-row items-center justify-center gap-2 rounded-2xl border border-sage-600 bg-sage-50 px-4 py-2.5 active:bg-sage-100 cursor-pointer"
-        >
-          <Icon name="plus" size={16} className="text-sage-700" />
-          <Text className="text-xs font-extrabold text-sage-800">
-            Descargar App (Acceso directo)
-          </Text>
-        </Pressable>
-      ) : (
-        <Pressable
-          onPress={handlePress}
-          accessibilityRole="button"
-          accessibilityLabel="Instalar aplicación en mi celular"
-          className="flex-row items-center gap-1.5 rounded-xl border border-sage-600 bg-sage-600 px-2.5 py-1.5 active:bg-sage-700 cursor-pointer"
-        >
-          <Icon name="plus" size={13} className="text-white" />
-          <Text className="text-[11px] font-extrabold text-white">
-            Instalar App
-          </Text>
-        </Pressable>
-      )}
-
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View className="flex-1 items-center justify-center bg-black/50 p-4">
-          <View className="w-full max-w-md gap-4 rounded-3xl border border-line bg-surface p-5 shadow-xl">
-            <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center gap-3">
-                <Logo size={42} />
-                <View>
-                  <Text className="text-base font-extrabold text-ink">
-                    Instalar Mercado Ganadero
-                  </Text>
-                  <Text className="text-xs text-ink-muted">
-                    Acceso directo en la pantalla de tu celular
-                  </Text>
-                </View>
-              </View>
-              <Pressable
-                onPress={() => setModalVisible(false)}
-                className="h-8 w-8 items-center justify-center rounded-full bg-surface-soft active:bg-surface-sunk cursor-pointer"
-              >
-                <Icon name="x" size={16} className="text-ink-soft" />
-              </Pressable>
-            </View>
-
-            <Text className="text-xs leading-5 text-ink-soft">
-              Podés agregar <Text className="font-bold text-ink">Mercado Ganadero (MEGA)</Text> a la
-              pantalla de inicio de tu teléfono para abrirla a pantalla completa igual que una
-              aplicación nativa, sin ocupar espacio extra:
-            </Text>
-
-            {isIos ? (
-              <View className="gap-2.5 rounded-2xl border border-sage-200 bg-sage-50/70 p-3.5">
-                <Text className="text-xs font-extrabold uppercase tracking-wider text-sage-800">
-                  En iPhone / iPad (Safari):
-                </Text>
-                <View className="flex-row items-start gap-2.5">
-                  <View className="h-5 w-5 items-center justify-center rounded-full bg-sage-600">
-                    <Text className="text-[11px] font-bold text-white">1</Text>
-                  </View>
-                  <Text className="flex-1 text-xs text-ink">
-                    Tocá el botón <Text className="font-bold">Compartir</Text> (el ícono cuadrado con
-                    una flecha hacia arriba en la barra de Safari).
-                  </Text>
-                </View>
-                <View className="flex-row items-start gap-2.5">
-                  <View className="h-5 w-5 items-center justify-center rounded-full bg-sage-600">
-                    <Text className="text-[11px] font-bold text-white">2</Text>
-                  </View>
-                  <Text className="flex-1 text-xs text-ink">
-                    Deslizá hacia abajo y elegí{" "}
-                    <Text className="font-bold">&quot;Agregar a inicio&quot;</Text> y luego{" "}
-                    <Text className="font-bold">&quot;Agregar&quot;</Text>.
-                  </Text>
-                </View>
-              </View>
-            ) : (
-              <View className="gap-2.5 rounded-2xl border border-sage-200 bg-sage-50/70 p-3.5">
-                <Text className="text-xs font-extrabold uppercase tracking-wider text-sage-800">
-                  En Android (Chrome / Samsung Internet):
-                </Text>
-                <View className="flex-row items-start gap-2.5">
-                  <View className="h-5 w-5 items-center justify-center rounded-full bg-sage-600">
-                    <Text className="text-[11px] font-bold text-white">1</Text>
-                  </View>
-                  <Text className="flex-1 text-xs text-ink">
-                    Tocá el menú de los <Text className="font-bold">3 puntos (⋮)</Text> arriba a la
-                    derecha en tu navegador.
-                  </Text>
-                </View>
-                <View className="flex-row items-start gap-2.5">
-                  <View className="h-5 w-5 items-center justify-center rounded-full bg-sage-600">
-                    <Text className="text-[11px] font-bold text-white">2</Text>
-                  </View>
-                  <Text className="flex-1 text-xs text-ink">
-                    Seleccioná{" "}
-                    <Text className="font-bold">&quot;Instalar aplicación&quot;</Text> o{" "}
-                    <Text className="font-bold">
-                      &quot;Agregar a la pantalla principal&quot;
-                    </Text>
-                    .
-                  </Text>
-                </View>
-              </View>
-            )}
-
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={handleCloseLater}
+    >
+      <View className="flex-1 justify-end bg-black/45">
+        <View className="w-full max-w-lg self-center rounded-t-[28px] bg-white px-6 pb-7 pt-5 shadow-2xl">
+          {/* Botón cerrar arriba a la derecha */}
+          <View className="flex-row items-center justify-end">
             <Pressable
-              onPress={() => setModalVisible(false)}
-              className="items-center justify-center rounded-2xl bg-sage-600 py-3 active:bg-sage-700 cursor-pointer"
+              onPress={handleCloseLater}
+              accessibilityRole="button"
+              accessibilityLabel="Cerrar"
+              className="h-9 w-9 items-center justify-center rounded-full bg-slate-100 active:bg-slate-200 cursor-pointer"
             >
-              <Text className="text-xs font-extrabold text-white">Entendido</Text>
+              <Icon name="x" size={18} className="text-slate-500" />
             </Pressable>
           </View>
+
+          {/* Ícono central de celular en recuadro redondeado */}
+          <View className="-mt-2 items-center">
+            <View className="mb-4 h-16 w-16 items-center justify-center rounded-2xl bg-sage-700 shadow-md">
+              <View className="h-8 w-5 items-center justify-end rounded-[4px] border-2 border-white pb-1">
+                <View className="h-1 w-1 rounded-full bg-white" />
+              </View>
+            </View>
+
+            <Text className="text-center text-lg font-extrabold text-sage-900">
+              Guardá Mercado Ganadero en tu celular
+            </Text>
+            <Text className="mt-1.5 text-center text-sm text-slate-500">
+              Accedé rápidamente a los lotes y ofertas desde tu teléfono.
+            </Text>
+          </View>
+
+          {mostrarAyudaFallback ? (
+            <View className="mt-4 rounded-2xl border border-sage-200 bg-sage-50 p-3.5">
+              <Text className="text-center text-xs leading-5 text-sage-900">
+                {isIos
+                  ? 'En iPhone (Safari): tocá el ícono "Compartir" en la barra inferior y seleccioná "Agregar a inicio".'
+                  : 'Si tu navegador no abrió la descarga directa, tocá los 3 puntos (⋮) arriba a la derecha y elegí "Instalar aplicación" o "Agregar a la pantalla principal".'}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Botón principal: Instalar acceso directo > */}
+          <Pressable
+            onPress={handleInstallClick}
+            disabled={instalando}
+            accessibilityRole="button"
+            className="mt-6 flex-row items-center justify-center gap-2 rounded-full bg-sage-700 py-4 shadow-sm active:bg-sage-800 cursor-pointer"
+          >
+            {instalando ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Text className="text-sm font-extrabold text-white">
+                  Instalar acceso directo
+                </Text>
+                <Icon name="chevronRight" size={16} color="#FFFFFF" />
+              </>
+            )}
+          </Pressable>
+
+          {/* Botón secundario: Lo haré más adelante */}
+          <Pressable
+            onPress={handleCloseLater}
+            accessibilityRole="button"
+            className="mt-3 items-center justify-center rounded-full border border-slate-200 bg-white py-3.5 active:bg-slate-50 cursor-pointer"
+          >
+            <Text className="text-sm font-bold text-sage-800">
+              Lo haré más adelante
+            </Text>
+          </Pressable>
+
+          {/* Enlace inferior: No volver a mostrar */}
+          <Pressable
+            onPress={handleNeverShowAgain}
+            accessibilityRole="button"
+            className="mt-4 items-center py-1 cursor-pointer"
+          >
+            <Text className="text-xs font-semibold text-slate-500">
+              No volver a mostrar
+            </Text>
+          </Pressable>
         </View>
-      </Modal>
-    </>
+      </View>
+    </Modal>
   );
 }

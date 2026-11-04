@@ -13,7 +13,7 @@ if (!fs.existsSync(indexPath)) {
   process.exit(0);
 }
 
-// Asegurar que los banners optimizados existan en dist/
+// Asegurar que los banners optimizados, manifest, service worker e íconos PWA existan en dist/
 const publicDir = path.join(rootDir, "public");
 for (const file of [
   "og-banner.jpg",
@@ -23,6 +23,8 @@ for (const file of [
   "logo.png",
   "logo_email.png",
   "logo_mega.png",
+  "manifest.json",
+  "sw.js",
 ]) {
   const src = path.join(publicDir, file);
   const dest = path.join(distDir, file);
@@ -31,11 +33,48 @@ for (const file of [
   }
 }
 
+const iconsSrcDir = path.join(publicDir, "icons");
+const iconsDestDir = path.join(distDir, "icons");
+if (fs.existsSync(iconsSrcDir)) {
+  fs.mkdirSync(iconsDestDir, { recursive: true });
+  for (const iconFile of fs.readdirSync(iconsSrcDir)) {
+    fs.copyFileSync(
+      path.join(iconsSrcDir, iconFile),
+      path.join(iconsDestDir, iconFile)
+    );
+  }
+}
+
 let html = fs.readFileSync(indexPath, "utf8");
 
 const metaTags = `
     <title>Mercado Ganadero · Compra y venta de hacienda</title>
     <meta name="description" content="Plataforma digital para la compra y venta de hacienda en Argentina. Publicá tus lotes, conectá con compradores directos y gestioná tus operaciones de forma simple." />
+
+    <!-- PWA Manifest & Mobile App Capabilities -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#2E5A3C" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="Mercado Ganadero" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Mercado Ganadero" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+
+    <script>
+      window.__deferredPwaPrompt = null;
+      window.addEventListener("beforeinstallprompt", function (e) {
+        e.preventDefault();
+        window.__deferredPwaPrompt = e;
+        window.dispatchEvent(new Event("pwa-prompt-ready"));
+      });
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+          navigator.serviceWorker.register("/sw.js").catch(function () {});
+        });
+      }
+    </script>
 
     <!-- Meta / Facebook App ID -->
     <meta property="fb:app_id" content="966242223397117" />
@@ -68,4 +107,4 @@ html = html.replace(/<meta name="description"[^>]*>/gi, "");
 html = html.replace("<head>", `<head>${metaTags}`);
 
 fs.writeFileSync(indexPath, html, "utf8");
-console.log("inject-og: Etiquetas Open Graph inyectadas exitosamente en dist/index.html");
+console.log("inject-og: Etiquetas Open Graph y PWA inyectadas exitosamente en dist/index.html");
