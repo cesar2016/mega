@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, Text, TextInput, View } from "react-native";
+import { useResponsive } from "lib/hooks/useResponsive";
 import { Icon } from "components/ui/Icon";
 import { Badge, Card } from "components/ui/Card";
 import { decodeGeografia, distanciaKm } from "lib/matching";
@@ -156,13 +157,6 @@ function claveCacheGeo(localidad?: string | null, provincia?: string | null): st
   return `${normalizarTextoGeo(localidad)}|${normalizarTextoGeo(provincia)}`;
 }
 
-/**
- * Resuelve coordenadas de una oferta o ubicación usando:
- * 1) Geometría PostGIS (`ubicacion` WKB hex)
- * 2) Caché dinámica Georef (`localidad|provincia`)
- * 3) Diccionario local por `localidad` normalizada
- * 4) Diccionario local por `provincia` normalizada
- */
 export function resolverCoordenadas(
   ubicacionHex?: string | null,
   localidad?: string | null,
@@ -182,7 +176,6 @@ export function resolverCoordenadas(
     return { lat: p.lat, lon: p.lon };
   }
 
-  // Si el usuario escribió "Localidad, Provincia" todo junto en un texto:
   if (locLimpia.includes(",")) {
     const [parteLoc, parteProv] = locLimpia.split(",").map((s) => s.trim());
     const claveCompuesta = claveCacheGeo(parteLoc, parteProv);
@@ -222,7 +215,6 @@ export type SugerenciaUbicacion = {
   coords: Punto;
 };
 
-/** Consulta la API oficial Georef Argentina para obtener coordenadas exactas de cualquier localidad. */
 async function buscarLocalidadesGeoref(texto: string): Promise<SugerenciaUbicacion[]> {
   const limpio = texto.trim();
   if (limpio.length < 2) return [];
@@ -305,7 +297,6 @@ function coincideCategoria(catOfertaRaw?: string | null, catFiltroRaw?: string |
   if (!catFiltro) return true;
   const catOferta = normalizarTextoGeo(catOfertaRaw);
   if (catOferta === catFiltro) return true;
-  // Si filtra por "Novillos" también contempla "Novillitos" si no eligió explícitamente otro
   if (catFiltro === "novillos" && (catOferta === "novillos" || catOferta === "novillitos")) {
     return true;
   }
@@ -323,7 +314,6 @@ export function filtrarOfertas(
   const precioMaxNum = precioMaxStr ? Number(precioMaxStr.replace(/[^0-9.]/g, "")) : null;
   const radioKmNum = filtros.radioKm.trim() ? Number(filtros.radioKm.replace(/[^0-9.]/g, "")) : null;
 
-  // Coordenadas declaradas por el buscador en el filtro de radio
   const puntoOrigen: Punto | null =
     filtros.ubicacionCoords ??
     (filtros.ubicacionTexto.trim()
@@ -351,7 +341,6 @@ export function filtrarOfertas(
 
     // 3. Radio (km) — requiere que el buscador haya declarado su ubicación
     if (radioKmNum != null && !Number.isNaN(radioKmNum) && radioKmNum > 0) {
-      // Si el usuario aún no declaró su ubicación, no podemos validar el radio todavía
       if (!puntoOrigen) {
         return false;
       }
@@ -389,6 +378,16 @@ export function OfertasFilterBar({
   totalSinFiltrar: number;
   ofertas?: OfertaResumen[];
 }) {
+  const { width } = useResponsive();
+  const esMobile = width < 768;
+
+  // Acordeón general del panel de filtros (en mobile inicia contraído para aprovechar la pantalla)
+  const [panelAbierto, setPanelAbierto] = useState(!esMobile);
+  // Acordeones individuales por sección (1: Categoría, 2: Precio, 3: Radio y Ubicación)
+  const [secCategoriaAbierta, setSecCategoriaAbierta] = useState(true);
+  const [secPrecioAbierta, setSecPrecioAbierta] = useState(!esMobile);
+  const [secRadioAbierta, setSecRadioAbierta] = useState(!esMobile);
+
   const [sugerencias, setSugerencias] = useState<SugerenciaUbicacion[]>([]);
   const [buscandoGeo, setBuscandoGeo] = useState(false);
   const [obteniendoGps, setObteniendoGps] = useState(false);
@@ -445,7 +444,6 @@ export function OfertasFilterBar({
       return;
     }
 
-    // Si ya coincide con la ubicación confirmada, no volver a abrir el menú
     if (filtros.ubicacionConfirmada && texto === filtros.ubicacionConfirmada && filtros.ubicacionCoords) {
       return;
     }
@@ -454,7 +452,6 @@ export function OfertasFilterBar({
     setBuscandoGeo(true);
 
     const timer = setTimeout(async () => {
-      // 1. Buscar coincidencias rápidas en diccionario local
       const norm = normalizarTextoGeo(texto);
       const locales: SugerenciaUbicacion[] = [];
       for (const [k, val] of Object.entries(COORDENADAS_REFERENCIA)) {
@@ -470,7 +467,6 @@ export function OfertasFilterBar({
         }
       }
 
-      // 2. Consultar API Georef Argentina para cualquier localidad del país
       const remotas = await buscarLocalidadesGeoref(texto);
       if (cancelado) return;
 
@@ -488,7 +484,6 @@ export function OfertasFilterBar({
       setSugerencias(combinadas.slice(0, 6));
       setBuscandoGeo(false);
 
-      // Si el usuario escribió un nombre que tiene match claro y aún no fijó coords, resolverlo automáticamente
       if (combinadas.length > 0) {
         const mejor = combinadas[0];
         const actual = filtrosRef.current;
@@ -574,18 +569,38 @@ export function OfertasFilterBar({
     }
   };
 
-  const hayFiltrosActivos = Boolean(
-    filtros.categoria ||
-      (filtros.precioMin ?? "").trim() ||
-      (filtros.precioMax ?? "").trim() ||
-      filtros.radioKm.trim() ||
-      (filtros.ubicacionTexto ?? "").trim()
+  const hayPrecioActivo = Boolean(
+    (filtros.precioMin ?? "").trim() || (filtros.precioMax ?? "").trim()
   );
+  const hayRadioActivo = Boolean(
+    filtros.radioKm.trim() || (filtros.ubicacionTexto ?? "").trim()
+  );
+  const cantidadFiltrosActivos =
+    (filtros.categoria ? 1 : 0) + (hayPrecioActivo ? 1 : 0) + (hayRadioActivo ? 1 : 0);
+  const hayFiltrosActivos = cantidadFiltrosActivos > 0;
 
   const radioActivoSinUbicacion =
     Boolean(filtros.radioKm.trim()) &&
     !filtros.ubicacionCoords &&
     !(filtros.ubicacionTexto ?? "").trim();
+
+  const resumenPrecio = () => {
+    const min = (filtros.precioMin ?? "").trim();
+    const max = (filtros.precioMax ?? "").trim();
+    if (min && max) return `$${Number(min).toLocaleString("es-AR")} - $${Number(max).toLocaleString("es-AR")}`;
+    if (min) return `Desde $${Number(min).toLocaleString("es-AR")}`;
+    if (max) return `Hasta $${Number(max).toLocaleString("es-AR")}`;
+    return "Sin límite";
+  };
+
+  const resumenRadio = () => {
+    const km = filtros.radioKm.trim();
+    const loc = filtros.ubicacionConfirmada || filtros.ubicacionTexto.trim();
+    if (km && loc) return `${km} km · ${loc.split(",")[0]}`;
+    if (km) return `${km} km (falta ubicación)`;
+    if (loc) return loc.split(",")[0];
+    return "Todo el país";
+  };
 
   const limpiar = () => {
     setErrorUbicacion(null);
@@ -595,324 +610,479 @@ export function OfertasFilterBar({
   };
 
   return (
-    <Card className="gap-3.5 border border-line-soft bg-surface p-4">
-      <View className="flex-row flex-wrap items-center justify-between gap-2">
-        <View className="flex-row items-center gap-2">
-          <View className="h-8 w-8 items-center justify-center rounded-xl bg-sage-50">
-            <Icon name="search" size={16} className="text-sage-700" />
+    <Card className="gap-3 border border-line-soft bg-surface p-3.5 sm:p-4">
+      {/* Cabecera principal del acordeón de filtros */}
+      <Pressable
+        onPress={() => setPanelAbierto((prev) => !prev)}
+        accessibilityRole="button"
+        accessibilityLabel={panelAbierto ? "Contraer filtros" : "Desplegar filtros"}
+        className="flex-row items-center justify-between gap-2 cursor-pointer"
+      >
+        <View className="min-w-0 flex-1 flex-row items-center gap-2.5">
+          <View className="h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sage-50 border border-sage-200">
+            <Icon name="sliders" size={16} className="text-sage-700" />
           </View>
-          <View>
-            <Text className="text-sm font-extrabold text-ink">Filtrar ofertas</Text>
-            <Text className="text-[11px] text-ink-muted">
-              Buscá lotes por categoría de animales, rango de precio y radio de distancia (km)
+          <View className="min-w-0 flex-1">
+            <View className="flex-row flex-wrap items-center gap-2">
+              <Text className="text-sm font-extrabold text-ink">Filtrar ofertas</Text>
+              {cantidadFiltrosActivos > 0 ? (
+                <View className="rounded-full bg-sage-600 px-2 py-0.5">
+                  <Text className="text-[10px] font-extrabold text-white">
+                    {cantidadFiltrosActivos} {cantidadFiltrosActivos === 1 ? "activo" : "activos"}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            <Text className="text-[11px] text-ink-muted" numberOfLines={1}>
+              {panelAbierto
+                ? "Tocá cada sección para desplegar o contraer"
+                : "Categoría, rango de precio y radio (km)"}
             </Text>
           </View>
         </View>
 
         <View className="flex-row items-center gap-2">
           <Badge tone={hayFiltrosActivos ? "sage" : "neutral"}>
-            {`${totalResultados} de ${totalSinFiltrar} lotes`}
+            {`${totalResultados} de ${totalSinFiltrar}`}
           </Badge>
-          {hayFiltrosActivos ? (
-            <Pressable
-              onPress={limpiar}
-              accessibilityRole="button"
-              className="flex-row items-center gap-1 rounded-xl border border-line bg-surface-soft px-2.5 py-1.5 active:bg-surface-sunk cursor-pointer"
-            >
-              <Icon name="x" size={13} className="text-ink-soft" />
-              <Text className="text-xs font-bold text-ink-soft">Limpiar filtros</Text>
-            </Pressable>
-          ) : null}
+          <View className="h-8 w-8 items-center justify-center rounded-xl border border-line bg-surface-soft">
+            <Icon
+              name={panelAbierto ? "chevronDown" : "chevronRight"}
+              size={16}
+              className="text-ink-soft"
+            />
+          </View>
         </View>
-      </View>
+      </Pressable>
 
-      {/* 1. Categoría de animales */}
-      <View className="gap-1.5">
-        <Text className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">
-          Categoría de animales
-        </Text>
-        <View className="flex-row flex-wrap gap-1.5">
+      {/* Resumen compacto de filtros activos cuando el panel está contraído */}
+      {!panelAbierto && hayFiltrosActivos ? (
+        <View className="flex-row flex-wrap items-center justify-between gap-2 border-t border-line-soft pt-2.5">
+          <View className="flex-row flex-wrap items-center gap-1.5">
+            {filtros.categoria ? (
+              <Badge tone="sage">{filtros.categoria}</Badge>
+            ) : null}
+            {hayPrecioActivo ? (
+              <Badge tone="wheat">{resumenPrecio()}</Badge>
+            ) : null}
+            {hayRadioActivo ? (
+              <Badge tone="clay">{resumenRadio()}</Badge>
+            ) : null}
+          </View>
           <Pressable
-            onPress={() => onChange({ ...filtros, categoria: "" })}
-            className={[
-              "rounded-xl border px-3 py-1.5 cursor-pointer",
-              filtros.categoria === ""
-                ? "border-sage-600 bg-sage-600"
-                : "border-line bg-surface-soft active:bg-surface-sunk",
-            ].join(" ")}
+            onPress={limpiar}
+            className="flex-row items-center gap-1 rounded-lg border border-line bg-surface-soft px-2.5 py-1 cursor-pointer"
           >
-            <Text
-              className={[
-                "text-xs font-bold",
-                filtros.categoria === "" ? "text-white" : "text-ink-soft",
-              ].join(" ")}
-            >
-              Todas
-            </Text>
+            <Icon name="x" size={12} className="text-ink-soft" />
+            <Text className="text-[11px] font-bold text-ink-soft">Limpiar</Text>
           </Pressable>
+        </View>
+      ) : null}
 
-          {CATEGORIAS_ANIMALES.map((cat) => {
-            const activa = filtros.categoria === cat;
-            return (
-              <Pressable
-                key={cat}
-                onPress={() =>
-                  onChange({ ...filtros, categoria: activa ? "" : cat })
-                }
-                className={[
-                  "rounded-xl border px-3 py-1.5 cursor-pointer",
-                  activa
-                    ? "border-sage-600 bg-sage-600"
-                    : "border-line bg-surface-soft active:bg-surface-sunk",
-                ].join(" ")}
-              >
+      {/* Cuerpo del panel de filtros en acordeones ordenados (1, 2, 3) */}
+      {panelAbierto ? (
+        <View className="gap-2.5 border-t border-line-soft pt-3">
+          {/* SECCIÓN 1: Categoría de animales */}
+          <View className="overflow-hidden rounded-2xl border border-line-soft bg-surface-soft/50">
+            <Pressable
+              onPress={() => setSecCategoriaAbierta((v) => !v)}
+              accessibilityRole="button"
+              className="flex-row items-center justify-between gap-2 px-3.5 py-2.5 cursor-pointer"
+            >
+              <View className="flex-row items-center gap-2.5">
+                <View className="h-6 w-6 items-center justify-center rounded-full bg-sage-600">
+                  <Text className="text-[11px] font-extrabold text-white">1</Text>
+                </View>
+                <Text className="text-xs font-extrabold uppercase tracking-wider text-ink">
+                  Categoría de animales
+                </Text>
+              </View>
+              <View className="flex-row items-center gap-2">
+                <Text className="text-xs font-bold text-sage-700">
+                  {filtros.categoria || "Todas"}
+                </Text>
+                <Icon
+                  name={secCategoriaAbierta ? "chevronDown" : "chevronRight"}
+                  size={15}
+                  className="text-ink-muted"
+                />
+              </View>
+            </Pressable>
+
+            {secCategoriaAbierta ? (
+              <View className="border-t border-line-soft bg-surface px-3.5 py-3">
+                <View className="flex-row flex-wrap gap-1.5">
+                  <Pressable
+                    onPress={() => onChange({ ...filtros, categoria: "" })}
+                    className={[
+                      "rounded-xl border px-3 py-2 cursor-pointer",
+                      filtros.categoria === ""
+                        ? "border-sage-600 bg-sage-600"
+                        : "border-line bg-surface-soft active:bg-surface-sunk",
+                    ].join(" ")}
+                  >
+                    <Text
+                      className={[
+                        "text-xs font-bold",
+                        filtros.categoria === "" ? "text-white" : "text-ink-soft",
+                      ].join(" ")}
+                    >
+                      Todas
+                    </Text>
+                  </Pressable>
+
+                  {CATEGORIAS_ANIMALES.map((cat) => {
+                    const activa = filtros.categoria === cat;
+                    return (
+                      <Pressable
+                        key={cat}
+                        onPress={() =>
+                          onChange({ ...filtros, categoria: activa ? "" : cat })
+                        }
+                        className={[
+                          "rounded-xl border px-3 py-2 cursor-pointer",
+                          activa
+                            ? "border-sage-600 bg-sage-600"
+                            : "border-line bg-surface-soft active:bg-surface-sunk",
+                        ].join(" ")}
+                      >
+                        <Text
+                          className={[
+                            "text-xs font-bold",
+                            activa ? "text-white" : "text-ink-soft",
+                          ].join(" ")}
+                        >
+                          {cat}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
+          </View>
+
+          {/* SECCIÓN 2: Rango de Precio (Entre $ y $) */}
+          <View className="overflow-hidden rounded-2xl border border-line-soft bg-surface-soft/50">
+            <Pressable
+              onPress={() => setSecPrecioAbierta((v) => !v)}
+              accessibilityRole="button"
+              className="flex-row items-center justify-between gap-2 px-3.5 py-2.5 cursor-pointer"
+            >
+              <View className="flex-row items-center gap-2.5">
+                <View className="h-6 w-6 items-center justify-center rounded-full bg-sage-600">
+                  <Text className="text-[11px] font-extrabold text-white">2</Text>
+                </View>
+                <Text className="text-xs font-extrabold uppercase tracking-wider text-ink">
+                  Precio (Entre $ y $)
+                </Text>
+              </View>
+              <View className="flex-row items-center gap-2">
                 <Text
                   className={[
                     "text-xs font-bold",
-                    activa ? "text-white" : "text-ink-soft",
+                    hayPrecioActivo ? "text-sage-700" : "text-ink-muted",
                   ].join(" ")}
                 >
-                  {cat}
+                  {resumenPrecio()}
                 </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* 2. Rango de Precio (Entre ... y ...) y 3. Radio (km) con Ubicación del buscador */}
-      <View className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        {/* Filtro Precio (Rango con 2 inputs: Entre ... y ...) */}
-        <View className="gap-1.5">
-          <Text className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">
-            Precio (Rango: Entre $ y $)
-          </Text>
-          <View className="flex-row items-center gap-2">
-            <View className="flex-1 flex-row items-center gap-1.5 rounded-xl border border-line bg-surface-soft px-3 py-2">
-              <Text className="text-xs font-bold text-ink-muted">Entre $</Text>
-              <TextInput
-                value={filtros.precioMin}
-                onChangeText={(t) =>
-                  onChange({ ...filtros, precioMin: t.replace(/[^0-9]/g, "") })
-                }
-                placeholder="Mínimo"
-                placeholderTextColor="#8C978E"
-                keyboardType="numeric"
-                className="min-w-0 flex-1 text-xs font-semibold text-ink outline-none"
-              />
-              {filtros.precioMin ? (
-                <Pressable onPress={() => onChange({ ...filtros, precioMin: "" })}>
-                  <Icon name="x" size={14} className="text-ink-muted" />
-                </Pressable>
-              ) : null}
-            </View>
-
-            <Text className="text-xs font-bold text-ink-muted">y</Text>
-
-            <View className="flex-1 flex-row items-center gap-1.5 rounded-xl border border-line bg-surface-soft px-3 py-2">
-              <Text className="text-xs font-bold text-ink-muted">$</Text>
-              <TextInput
-                value={filtros.precioMax}
-                onChangeText={(t) =>
-                  onChange({ ...filtros, precioMax: t.replace(/[^0-9]/g, "") })
-                }
-                placeholder="Máximo"
-                placeholderTextColor="#8C978E"
-                keyboardType="numeric"
-                className="min-w-0 flex-1 text-xs font-semibold text-ink outline-none"
-              />
-              {filtros.precioMax ? (
-                <Pressable onPress={() => onChange({ ...filtros, precioMax: "" })}>
-                  <Icon name="x" size={14} className="text-ink-muted" />
-                </Pressable>
-              ) : null}
-            </View>
-          </View>
-        </View>
-
-        {/* Filtro Radio (km) + Declaración de ubicación del buscador */}
-        <View className="gap-2 rounded-2xl border border-line-soft bg-surface-soft/50 p-3">
-          <View className="flex-row flex-wrap items-center justify-between gap-1">
-            <Text className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">
-              Radio de búsqueda (km) y tu ubicación
-            </Text>
-            {filtros.ubicacionCoords && filtros.ubicacionConfirmada ? (
-              <View className="flex-row items-center gap-1 rounded-lg bg-sage-50 border border-sage-200 px-2 py-0.5">
-                <Icon name="mapPin" size={11} className="text-sage-700" />
-                <Text className="text-[10px] font-bold text-sage-800">
-                  Desde: {filtros.ubicacionConfirmada}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-
-          {/* Paso 1: Declarar ubicación del buscador */}
-          <View className="gap-1.5">
-            <View className="flex-row items-center gap-2">
-              <View
-                className={[
-                  "flex-1 flex-row items-center gap-2 rounded-xl border bg-surface px-3 py-2",
-                  radioActivoSinUbicacion ? "border-amber-500" : "border-line",
-                ].join(" ")}
-              >
                 <Icon
-                  name="mapPin"
+                  name={secPrecioAbierta ? "chevronDown" : "chevronRight"}
                   size={15}
-                  className={
-                    filtros.ubicacionCoords ? "text-sage-600" : "text-clay-600"
-                  }
+                  className="text-ink-muted"
                 />
-                <TextInput
-                  value={filtros.ubicacionTexto}
-                  onFocus={() => setMostrarSugerencias(true)}
-                  onChangeText={(t) => {
-                    setErrorUbicacion(null);
-                    setMostrarSugerencias(true);
-                    const coordsDirectas = t.trim()
-                      ? resolverCoordenadas(null, t, null)
-                      : null;
-                    onChange({
-                      ...filtros,
-                      ubicacionTexto: t,
-                      ubicacionConfirmada: coordsDirectas ? t.trim() : "",
-                      ubicacionCoords: coordsDirectas,
-                    });
-                  }}
-                  placeholder="1º Declará tu localidad o provincia (ej: Huanqueros, Río Cuarto...)"
-                  placeholderTextColor="#8C978E"
-                  className="min-w-0 flex-1 text-xs font-semibold text-ink outline-none"
-                />
-                {buscandoGeo ? (
-                  <ActivityIndicator size="small" className="text-sage-600" />
-                ) : null}
-                {filtros.ubicacionTexto ? (
-                  <Pressable
-                    onPress={() => {
-                      setSugerencias([]);
-                      setMostrarSugerencias(false);
-                      onChange({
-                        ...filtros,
-                        ubicacionTexto: "",
-                        ubicacionConfirmada: "",
-                        ubicacionCoords: null,
-                      });
-                    }}
-                  >
-                    <Icon name="x" size={14} className="text-ink-muted" />
-                  </Pressable>
-                ) : null}
               </View>
+            </Pressable>
 
+            {secPrecioAbierta ? (
+              <View className="border-t border-line-soft bg-surface px-3.5 py-3">
+                <View className="flex-col gap-2 sm:flex-row sm:items-center">
+                  <View className="flex-1 flex-row items-center gap-2 rounded-xl border border-line bg-surface-soft px-3 py-2.5">
+                    <Text className="text-xs font-bold text-ink-muted">Entre $</Text>
+                    <TextInput
+                      value={filtros.precioMin}
+                      onChangeText={(t) =>
+                        onChange({ ...filtros, precioMin: t.replace(/[^0-9]/g, "") })
+                      }
+                      placeholder="Mínimo"
+                      placeholderTextColor="#8C978E"
+                      keyboardType="numeric"
+                      className="min-w-0 flex-1 text-xs font-semibold text-ink outline-none"
+                    />
+                    {filtros.precioMin ? (
+                      <Pressable onPress={() => onChange({ ...filtros, precioMin: "" })}>
+                        <Icon name="x" size={14} className="text-ink-muted" />
+                      </Pressable>
+                    ) : null}
+                  </View>
+
+                  <Text className="hidden text-xs font-bold text-ink-muted sm:flex">y</Text>
+
+                  <View className="flex-1 flex-row items-center gap-2 rounded-xl border border-line bg-surface-soft px-3 py-2.5">
+                    <Text className="text-xs font-bold text-ink-muted">Hasta $</Text>
+                    <TextInput
+                      value={filtros.precioMax}
+                      onChangeText={(t) =>
+                        onChange({ ...filtros, precioMax: t.replace(/[^0-9]/g, "") })
+                      }
+                      placeholder="Máximo"
+                      placeholderTextColor="#8C978E"
+                      keyboardType="numeric"
+                      className="min-w-0 flex-1 text-xs font-semibold text-ink outline-none"
+                    />
+                    {filtros.precioMax ? (
+                      <Pressable onPress={() => onChange({ ...filtros, precioMax: "" })}>
+                        <Icon name="x" size={14} className="text-ink-muted" />
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
+              </View>
+            ) : null}
+          </View>
+
+          {/* SECCIÓN 3: Radio de búsqueda (km) y Ubicación */}
+          <View className="overflow-hidden rounded-2xl border border-line-soft bg-surface-soft/50">
+            <Pressable
+              onPress={() => setSecRadioAbierta((v) => !v)}
+              accessibilityRole="button"
+              className="flex-row items-center justify-between gap-2 px-3.5 py-2.5 cursor-pointer"
+            >
+              <View className="min-w-0 flex-1 flex-row items-center gap-2.5">
+                <View className="h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sage-600">
+                  <Text className="text-[11px] font-extrabold text-white">3</Text>
+                </View>
+                <Text
+                  className="min-w-0 flex-1 text-xs font-extrabold uppercase tracking-wider text-ink"
+                  numberOfLines={1}
+                >
+                  Ubicación y Radio (km)
+                </Text>
+              </View>
+              <View className="flex-row items-center gap-2">
+                <Text
+                  className={[
+                    "text-xs font-bold",
+                    hayRadioActivo ? "text-sage-700" : "text-ink-muted",
+                  ].join(" ")}
+                  numberOfLines={1}
+                >
+                  {resumenRadio()}
+                </Text>
+                <Icon
+                  name={secRadioAbierta ? "chevronDown" : "chevronRight"}
+                  size={15}
+                  className="text-ink-muted"
+                />
+              </View>
+            </Pressable>
+
+            {secRadioAbierta ? (
+              <View className="gap-3 border-t border-line-soft bg-surface px-3.5 py-3">
+                {/* Paso A: Declarar ubicación del buscador */}
+                <View className="gap-1.5">
+                  <View className="flex-row flex-wrap items-center justify-between gap-1">
+                    <Text className="text-[11px] font-bold text-ink-soft">
+                      1º Tu punto de partida (localidad o provincia)
+                    </Text>
+                    {filtros.ubicacionCoords && filtros.ubicacionConfirmada ? (
+                      <View className="flex-row items-center gap-1 rounded-lg border border-sage-200 bg-sage-50 px-2 py-0.5">
+                        <Icon name="mapPin" size={11} className="text-sage-700" />
+                        <Text className="text-[10px] font-bold text-sage-800">
+                          {filtros.ubicacionConfirmada}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+
+                  <View className="flex-col gap-2 sm:flex-row sm:items-center">
+                    <View
+                      className={[
+                        "flex-1 flex-row items-center gap-2 rounded-xl border bg-surface-soft px-3 py-2.5",
+                        radioActivoSinUbicacion ? "border-amber-500" : "border-line",
+                      ].join(" ")}
+                    >
+                      <Icon
+                        name="mapPin"
+                        size={15}
+                        className={
+                          filtros.ubicacionCoords ? "text-sage-600" : "text-clay-600"
+                        }
+                      />
+                      <TextInput
+                        value={filtros.ubicacionTexto}
+                        onFocus={() => setMostrarSugerencias(true)}
+                        onChangeText={(t) => {
+                          setErrorUbicacion(null);
+                          setMostrarSugerencias(true);
+                          const coordsDirectas = t.trim()
+                            ? resolverCoordenadas(null, t, null)
+                            : null;
+                          onChange({
+                            ...filtros,
+                            ubicacionTexto: t,
+                            ubicacionConfirmada: coordsDirectas ? t.trim() : "",
+                            ubicacionCoords: coordsDirectas,
+                          });
+                        }}
+                        placeholder="Ej: Huanqueros, San Cristóbal, Río Cuarto..."
+                        placeholderTextColor="#8C978E"
+                        className="min-w-0 flex-1 text-xs font-semibold text-ink outline-none"
+                      />
+                      {buscandoGeo ? (
+                        <ActivityIndicator size="small" className="text-sage-600" />
+                      ) : null}
+                      {filtros.ubicacionTexto ? (
+                        <Pressable
+                          onPress={() => {
+                            setSugerencias([]);
+                            setMostrarSugerencias(false);
+                            onChange({
+                              ...filtros,
+                              ubicacionTexto: "",
+                              ubicacionConfirmada: "",
+                              ubicacionCoords: null,
+                            });
+                          }}
+                        >
+                          <Icon name="x" size={14} className="text-ink-muted" />
+                        </Pressable>
+                      ) : null}
+                    </View>
+
+                    <Pressable
+                      onPress={usarUbicacionGps}
+                      disabled={obteniendoGps}
+                      accessibilityRole="button"
+                      className="flex-row items-center justify-center gap-1.5 rounded-xl border border-sage-600 bg-sage-50 px-3.5 py-2.5 active:bg-sage-100 cursor-pointer"
+                    >
+                      {obteniendoGps ? (
+                        <ActivityIndicator size="small" className="text-sage-700" />
+                      ) : (
+                        <Icon name="mapPin" size={14} className="text-sage-700" />
+                      )}
+                      <Text className="text-xs font-extrabold text-sage-800">
+                        Usar mi GPS
+                      </Text>
+                    </Pressable>
+                  </View>
+
+                  {mostrarSugerencias && sugerencias.length > 0 ? (
+                    <View className="gap-1 rounded-xl border border-line bg-surface p-1.5 shadow-sm">
+                      <Text className="px-2 py-0.5 text-[10px] font-bold uppercase text-ink-muted">
+                        Seleccioná tu localidad exacta:
+                      </Text>
+                      {sugerencias.map((sug) => (
+                        <Pressable
+                          key={sug.id}
+                          onPress={() => seleccionarSugerencia(sug)}
+                          className="flex-row items-center justify-between rounded-lg px-2.5 py-2 hover:bg-sage-50 active:bg-sage-100 cursor-pointer"
+                        >
+                          <View className="flex-row items-center gap-2">
+                            <Icon name="mapPin" size={13} className="text-sage-700" />
+                            <Text className="text-xs font-bold text-ink">{sug.label}</Text>
+                          </View>
+                          <Text className="text-[10px] font-semibold text-sage-700">
+                            Elegir
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : null}
+
+                  {errorUbicacion ? (
+                    <Text className="text-[11px] font-semibold text-clay-700">
+                      {errorUbicacion}
+                    </Text>
+                  ) : null}
+
+                  {radioActivoSinUbicacion ? (
+                    <View className="flex-row items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2">
+                      <Icon name="alert" size={14} className="text-amber-700" />
+                      <Text className="flex-1 text-[11px] font-bold text-amber-900">
+                        Declará tu ubicación arriba (localidad/provincia o &quot;Usar mi GPS&quot;) para filtrar lotes a {filtros.radioKm} km.
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                {/* Paso B: Indicar o elegir el radio en km */}
+                <View className="gap-2">
+                  <Text className="text-[11px] font-bold text-ink-soft">
+                    2º Distancia máxima a la redonda (km)
+                  </Text>
+                  <View className="flex-row items-center gap-2 rounded-xl border border-line bg-surface-soft px-3 py-2.5">
+                    <Icon name="ruler" size={15} className="text-clay-600" />
+                    <TextInput
+                      value={filtros.radioKm}
+                      onChangeText={(t) =>
+                        onChange({ ...filtros, radioKm: t.replace(/[^0-9]/g, "") })
+                      }
+                      placeholder="Radio en km (ej: 100)"
+                      placeholderTextColor="#8C978E"
+                      keyboardType="numeric"
+                      className="flex-1 text-xs font-semibold text-ink outline-none"
+                    />
+                    {filtros.radioKm ? (
+                      <Pressable onPress={() => onChange({ ...filtros, radioKm: "" })}>
+                        <Icon name="x" size={14} className="text-ink-muted" />
+                      </Pressable>
+                    ) : null}
+                  </View>
+
+                  <View className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-row sm:flex-wrap">
+                    {RADIOS_KM_OPCIONES.map((km) => {
+                      const activo = filtros.radioKm === String(km);
+                      return (
+                        <Pressable
+                          key={km}
+                          onPress={() =>
+                            onChange({
+                              ...filtros,
+                              radioKm: activo ? "" : String(km),
+                            })
+                          }
+                          className={[
+                            "items-center justify-center rounded-xl border px-3 py-2 cursor-pointer",
+                            activo
+                              ? "border-clay-500 bg-clay-500"
+                              : "border-line bg-surface-soft active:bg-surface-sunk",
+                          ].join(" ")}
+                        >
+                          <Text
+                            className={[
+                              "text-xs font-bold",
+                              activo ? "text-white" : "text-ink-soft",
+                            ].join(" ")}
+                          >
+                            {km} km
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Pie del acordeón: botón limpiar cuando hay filtros activos */}
+          {hayFiltrosActivos ? (
+            <View className="flex-row items-center justify-end pt-1">
               <Pressable
-                onPress={usarUbicacionGps}
-                disabled={obteniendoGps}
+                onPress={limpiar}
                 accessibilityRole="button"
-                className="flex-row items-center gap-1.5 rounded-xl border border-sage-600 bg-sage-50 px-3 py-2 active:bg-sage-100 cursor-pointer"
+                className="flex-row items-center gap-1.5 rounded-xl border border-line bg-surface-soft px-3 py-2 active:bg-surface-sunk cursor-pointer"
               >
-                {obteniendoGps ? (
-                  <ActivityIndicator size="small" className="text-sage-700" />
-                ) : (
-                  <Icon name="mapPin" size={14} className="text-sage-700" />
-                )}
-                <Text className="text-xs font-extrabold text-sage-800">
-                  Mi GPS
+                <Icon name="x" size={13} className="text-ink-soft" />
+                <Text className="text-xs font-bold text-ink-soft">
+                  Limpiar todos los filtros
                 </Text>
               </Pressable>
             </View>
-
-            {/* Sugerencias de localidades de Argentina (API Georef + Diccionario) */}
-            {mostrarSugerencias && sugerencias.length > 0 ? (
-              <View className="rounded-xl border border-line bg-surface p-1.5 shadow-sm gap-1">
-                <Text className="px-2 py-0.5 text-[10px] font-bold uppercase text-ink-muted">
-                  Seleccioná tu localidad exacta:
-                </Text>
-                {sugerencias.map((sug) => (
-                  <Pressable
-                    key={sug.id}
-                    onPress={() => seleccionarSugerencia(sug)}
-                    className="flex-row items-center justify-between rounded-lg px-2.5 py-1.5 hover:bg-sage-50 active:bg-sage-100 cursor-pointer"
-                  >
-                    <View className="flex-row items-center gap-2">
-                      <Icon name="mapPin" size={13} className="text-sage-700" />
-                      <Text className="text-xs font-bold text-ink">{sug.label}</Text>
-                    </View>
-                    <Text className="text-[10px] font-semibold text-sage-700">
-                      Elegir
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-
-            {errorUbicacion ? (
-              <Text className="text-[11px] font-semibold text-clay-700">
-                {errorUbicacion}
-              </Text>
-            ) : null}
-
-            {radioActivoSinUbicacion ? (
-              <View className="flex-row items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2">
-                <Icon name="alert" size={14} className="text-amber-700" />
-                <Text className="flex-1 text-[11px] font-bold text-amber-900">
-                  Declará tu ubicación arriba (escribí tu localidad/provincia o tocá &quot;Mi GPS&quot;) para buscar lotes en un radio de {filtros.radioKm} km.
-                </Text>
-              </View>
-            ) : null}
-          </View>
-
-          {/* Paso 2: Indicar o elegir el radio en km */}
-          <View className="flex-row items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2">
-            <Icon name="ruler" size={15} className="text-clay-600" />
-            <TextInput
-              value={filtros.radioKm}
-              onChangeText={(t) =>
-                onChange({ ...filtros, radioKm: t.replace(/[^0-9]/g, "") })
-              }
-              placeholder="2º Radio en km (ej: 100 km)"
-              placeholderTextColor="#8C978E"
-              keyboardType="numeric"
-              className="flex-1 text-xs font-semibold text-ink outline-none"
-            />
-            {filtros.radioKm ? (
-              <Pressable onPress={() => onChange({ ...filtros, radioKm: "" })}>
-                <Icon name="x" size={14} className="text-ink-muted" />
-              </Pressable>
-            ) : null}
-          </View>
-
-          <View className="flex-row flex-wrap gap-1.5 pt-0.5">
-            {RADIOS_KM_OPCIONES.map((km) => {
-              const activo = filtros.radioKm === String(km);
-              return (
-                <Pressable
-                  key={km}
-                  onPress={() =>
-                    onChange({
-                      ...filtros,
-                      radioKm: activo ? "" : String(km),
-                    })
-                  }
-                  className={[
-                    "rounded-lg border px-2 py-1 cursor-pointer",
-                    activo
-                      ? "border-clay-500 bg-clay-500"
-                      : "border-line-soft bg-surface",
-                  ].join(" ")}
-                >
-                  <Text
-                    className={[
-                      "text-[11px] font-bold",
-                      activo ? "text-white" : "text-ink-muted",
-                    ].join(" ")}
-                  >
-                    {km} km
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          ) : null}
         </View>
-      </View>
+      ) : null}
     </Card>
   );
 }

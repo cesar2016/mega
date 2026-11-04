@@ -6,8 +6,7 @@ import { Icon } from "components/ui/Icon";
 
 /**
  * Botón en la barra superior (móvil) o barra lateral (escritorio):
- * Si el navegador ya tiene listo el instalador nativo, lo lanza directo en 1 toque;
- * si no, abre el cuadro inferior de instalación directa ("Guardá Mercado Ganadero en tu celular").
+ * Dice "Descargar App" y lanza la descarga/instalación directa de la PWA.
  */
 export function InstallAppButton({
   variant = "compact",
@@ -28,7 +27,7 @@ export function InstallAppButton({
       const res = await triggerNativePrompt();
       setInstalando(false);
       if (res === "accepted") {
-        showToast("¡Acceso directo instalado en tu celular!", "success");
+        showToast("¡App descargada en tu celular!", "success");
         return;
       }
       if (res === "dismissed") {
@@ -44,7 +43,7 @@ export function InstallAppButton({
         onPress={handlePress}
         disabled={instalando}
         accessibilityRole="button"
-        accessibilityLabel="Instalar acceso directo en el celular"
+        accessibilityLabel="Descargar App"
         className="mb-2.5 flex-row items-center justify-center gap-2 rounded-2xl border border-sage-600 bg-sage-50 px-4 py-2.5 active:bg-sage-100 cursor-pointer"
       >
         {instalando ? (
@@ -53,7 +52,7 @@ export function InstallAppButton({
           <Icon name="plus" size={16} className="text-sage-700" />
         )}
         <Text className="text-xs font-extrabold text-sage-800">
-          Instalar acceso directo
+          Descargar App
         </Text>
       </Pressable>
     );
@@ -64,7 +63,7 @@ export function InstallAppButton({
       onPress={handlePress}
       disabled={instalando}
       accessibilityRole="button"
-      accessibilityLabel="Instalar acceso directo en mi celular"
+      accessibilityLabel="Descargar App"
       className="flex-row items-center gap-1.5 rounded-xl border border-sage-600 bg-sage-600 px-2.5 py-1.5 active:bg-sage-700 cursor-pointer"
     >
       {instalando ? (
@@ -73,17 +72,17 @@ export function InstallAppButton({
         <Icon name="plus" size={13} className="text-white" />
       )}
       <Text className="text-[11px] font-extrabold text-white">
-        Instalar App
+        Descargar App
       </Text>
     </Pressable>
   );
 }
 
 /**
- * Cuadro inferior estilo Bottom Sheet (idéntico al diseño de la Imagen 2):
+ * Cuadro inferior estilo Bottom Sheet:
  * - "Guardá Mercado Ganadero en tu celular"
  * - "Accedé rápidamente a los lotes y ofertas desde tu teléfono."
- * - [ Instalar acceso directo > ]
+ * - [ Descargar App > ]
  * - [ Lo haré más adelante ]
  * - "No volver a mostrar"
  */
@@ -141,7 +140,7 @@ export function PwaInstallSheet() {
       setAutoVisible(false);
       setMostrarAyudaFallback(false);
       closeSheet("never");
-      showToast("¡Acceso directo instalado en tu celular!", "success");
+      showToast("¡App descargada en tu celular!", "success");
       return;
     }
 
@@ -150,7 +149,7 @@ export function PwaInstallSheet() {
       return;
     }
 
-    // Si el navegador aún no habilitó el disparo automático (ej. Safari en iOS o ya instalada)
+    // Si el navegador aún no habilitó el disparo automático (ej. Safari en iOS)
     setMostrarAyudaFallback(true);
   };
 
@@ -196,12 +195,12 @@ export function PwaInstallSheet() {
               <Text className="text-center text-xs leading-5 text-sage-900">
                 {isIos
                   ? 'En iPhone (Safari): tocá el ícono "Compartir" en la barra inferior y seleccioná "Agregar a inicio".'
-                  : 'Si tu navegador no abrió la descarga directa, tocá los 3 puntos (⋮) arriba a la derecha y elegí "Instalar aplicación" o "Agregar a la pantalla principal".'}
+                  : 'Si tu navegador no abrió la descarga directa, tocá los 3 puntos (⋮) arriba a la derecha y elegí "Instalar aplicación".'}
               </Text>
             </View>
           ) : null}
 
-          {/* Botón principal: Instalar acceso directo > */}
+          {/* Botón principal: Descargar App > */}
           <Pressable
             onPress={handleInstallClick}
             disabled={instalando}
@@ -213,7 +212,7 @@ export function PwaInstallSheet() {
             ) : (
               <>
                 <Text className="text-sm font-extrabold text-white">
-                  Instalar acceso directo
+                  Descargar App
                 </Text>
                 <Icon name="chevronRight" size={16} color="#FFFFFF" />
               </>
