@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase, isSupabaseConfigured } from "lib/supabase";
 import { detectarDatosContacto } from "lib/contactFilter";
+import { enviarPushRemoto, mostrarNotificacionSistema } from "lib/pushNotifications";
 import { maskNombreUsuario, showToast } from "lib/utils";
 import { useAuthStore } from "store/authStore";
 import { useNotificacionesStore } from "store/notificacionesStore";
@@ -76,6 +77,15 @@ function notificarMensajeEntrante(cuerpo?: string | null, id?: string) {
       ? `${cuerpo.slice(0, 55)}…`
       : cuerpo || "Tenés una nueva respuesta";
   showToast(`Nuevo mensaje en el chat: «${extracto}»`, "info");
+
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+    void mostrarNotificacionSistema({
+      title: "💬 Nuevo mensaje en Mercado Ganadero",
+      body: extracto,
+      url: "/(main)/tabs/chat",
+      tag: id ? `msg-${id}` : "msg-chat",
+    });
+  }
 }
 
 /**
@@ -564,5 +574,35 @@ export async function enviarMensaje(params: {
     .single();
 
   if (error) throw error;
+
+  // Enviar notificación Web Push en segundo plano al destinatario (para cuando tiene la app cerrada)
+  void (async () => {
+    try {
+      const { data: conv } = await supabase
+        .from("conversaciones")
+        .select("participante_1, participante_2")
+        .eq("id", params.conversacionId)
+        .maybeSingle();
+
+      if (conv) {
+        const destinatarioId =
+          conv.participante_1 === params.remitenteId
+            ? conv.participante_2
+            : conv.participante_1;
+        if (destinatarioId) {
+          await enviarPushRemoto({
+            userId: String(destinatarioId),
+            title: "💬 Nuevo mensaje en Mercado Ganadero",
+            body: texto.length > 85 ? `${texto.slice(0, 85)}…` : texto,
+            url: `/(main)/chat/${params.conversacionId}`,
+            tag: `chat-${params.conversacionId}`,
+          });
+        }
+      }
+    } catch {
+      // No interrumpir el envío del mensaje si falla el push
+    }
+  })();
+
   return data as MensajeRow;
 }

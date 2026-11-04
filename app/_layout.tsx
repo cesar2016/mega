@@ -6,6 +6,7 @@ import { Stack } from "expo-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { supabase, isSupabaseConfigured } from "lib/supabase";
 import { registerPwaServiceWorker } from "lib/pwa";
+import { usePushNotificationsBootstrap } from "lib/pushNotifications";
 import { useRegistrarVisitaSitio } from "lib/superAdmin";
 import { useAuthStore } from "store/authStore";
 import { PwaInstallSheet } from "components/pwa/InstallAppButton";
@@ -23,6 +24,7 @@ export default function RootLayout() {
   const profile = useAuthStore((state) => state.profile);
 
   useRegistrarVisitaSitio(user, profile);
+  usePushNotificationsBootstrap(user?.id);
 
   useEffect(() => {
     registerPwaServiceWorker();

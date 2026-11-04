@@ -632,6 +632,31 @@ module.exports = async function handler(req, res) {
           body: JSON.stringify(notifs),
         });
       }
+
+      // 7. Enviar notificaciones Web Push en segundo plano (para celular/escritorio aún con la app cerrada)
+      try {
+        const { enviarPushAUsuario } = require("./push.js");
+        if (oferta.productor_id) {
+          await enviarPushAUsuario({
+            userId: oferta.productor_id,
+            title: `🐮 ¡Vendiste tu lote de ${oferta.categoria}!`,
+            body: `${comprador.nombre} confirmó la compra (${oferta.cantidad} cab.). Tocá para ver sus datos de contacto.`,
+            url: "/(main)/tabs/operaciones?tab=ventas",
+            tag: `venta-${oferta.id}`,
+          });
+        }
+        if (compradorId) {
+          await enviarPushAUsuario({
+            userId: compradorId,
+            title: `✅ Compra confirmada: ${oferta.categoria}`,
+            body: `Adquiriste el lote de ${vendedor.nombre}. Tocá para ver los datos del productor.`,
+            url: "/(main)/tabs/operaciones?tab=compras",
+            tag: `compra-${oferta.id}`,
+          });
+        }
+      } catch (pushErr) {
+        console.error("Error al enviar Web Push de compra/venta:", pushErr);
+      }
     } catch (e) {
       console.error("Error al registrar notificaciones:", e);
     }
