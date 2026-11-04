@@ -249,6 +249,7 @@ export default function FeedScreen() {
           onChange={setFiltros}
           totalResultados={lista.length}
           totalSinFiltrar={listaBase.length}
+          ofertas={listaBase}
         />
 
         <Gradient

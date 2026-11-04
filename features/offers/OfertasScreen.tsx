@@ -252,6 +252,7 @@ export default function OfertasScreen() {
             onChange={setFiltros}
             totalResultados={listaPublicaciones.length}
             totalSinFiltrar={listaPublicacionesBase.length}
+            ofertas={listaPublicacionesBase}
           />
         ) : null}
 
