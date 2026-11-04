@@ -6,6 +6,7 @@ import { supabase, isSupabaseConfigured } from "lib/supabase";
 import { useAuthStore, UserRol } from "store/authStore";
 import { useAuthRedirect } from "lib/hooks/useAuthRedirect";
 import { useMisOperaciones, useOperacionesSinVer } from "lib/hooks/useOperaciones";
+import { playMessageSound, playVentaSound, useSoundStore } from "lib/sound";
 import { isSuperAdmin } from "lib/superAdmin";
 import {
   formatCuit,
@@ -665,6 +666,9 @@ export default function PerfilScreen() {
               </View>
             </View>
 
+            {/* Configuración de Sonidos de Mensajes y Ventas */}
+            <ConfiguracionSonidosCard />
+
             <Card className="flex-row items-center gap-4">
               <View className="h-11 w-11 items-center justify-center rounded-2xl bg-clay-50">
                 <Icon name="logOut" size={19} className="text-clay-600" />
@@ -687,5 +691,182 @@ export default function PerfilScreen() {
         )}
       </Screen>
     </View>
+  );
+}
+
+function ConfiguracionSonidosCard() {
+  const { enabled, volume, setEnabled, setVolume } = useSoundStore();
+  const VOLUMEN_PRESETS = [20, 40, 60, 80, 100];
+
+  return (
+    <Card className="gap-4 border border-line-soft bg-surface">
+      <View className="flex-row flex-wrap items-center justify-between gap-3">
+        <View className="flex-row items-center gap-3">
+          <View
+            className={[
+              "h-11 w-11 items-center justify-center rounded-2xl",
+              enabled ? "bg-sage-50" : "bg-surface-soft",
+            ].join(" ")}
+          >
+            <Icon
+              name="sliders"
+              size={19}
+              className={enabled ? "text-sage-600" : "text-ink-muted"}
+            />
+          </View>
+          <View className="gap-0.5">
+            <View className="flex-row items-center gap-2">
+              <Text className="text-sm font-extrabold text-ink">
+                Sonidos de notificaciones
+              </Text>
+              <Badge tone={enabled ? "sage" : "neutral"}>
+                {enabled ? `Activados · ${volume}%` : "Silenciado"}
+              </Badge>
+            </View>
+            <Text className="text-xs text-ink-muted">
+              Alertas sonoras al recibir mensajes en el chat o cuando vendés tu rodeo
+            </Text>
+          </View>
+        </View>
+
+        <Pressable
+          onPress={() => {
+            const next = !enabled;
+            setEnabled(next);
+            showToast(
+              next ? "Sonidos de notificaciones activados" : "Sonidos silenciados",
+              "info"
+            );
+          }}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: enabled }}
+          className={[
+            "flex-row items-center gap-2 rounded-2xl border px-4 py-2.5 cursor-pointer",
+            enabled
+              ? "border-sage-600 bg-sage-600"
+              : "border-line bg-surface-soft active:bg-surface-sunk",
+          ].join(" ")}
+        >
+          <Icon
+            name={enabled ? "check" : "ban"}
+            size={14}
+            className={enabled ? "text-white" : "text-ink-soft"}
+          />
+          <Text
+            className={[
+              "text-xs font-extrabold",
+              enabled ? "text-white" : "text-ink-soft",
+            ].join(" ")}
+          >
+            {enabled ? "Sonidos activados" : "Activar sonidos"}
+          </Text>
+        </Pressable>
+      </View>
+
+      {/* Control de Volumen */}
+      <View
+        className={[
+          "gap-3 rounded-2xl border border-line-soft bg-surface-soft/60 p-3.5",
+          !enabled ? "opacity-55" : "",
+        ].join(" ")}
+      >
+        <View className="flex-row items-center justify-between">
+          <Text className="text-xs font-bold uppercase tracking-wider text-ink-muted">
+            Volumen de sonidos
+          </Text>
+          <Text className="text-xs font-extrabold text-sage-800">{volume}%</Text>
+        </View>
+
+        {/* Barra de nivel e incremento/decremento */}
+        <View className="flex-row items-center gap-2.5">
+          <Pressable
+            onPress={() => {
+              if (!enabled) setEnabled(true);
+              setVolume(volume - 10);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Bajar volumen"
+            className="h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface active:bg-surface-sunk cursor-pointer"
+          >
+            <Text className="text-base font-extrabold text-ink-soft">−</Text>
+          </Pressable>
+
+          <View className="h-3 flex-1 overflow-hidden rounded-full bg-line-soft">
+            <View
+              style={{ width: `${volume}%` }}
+              className="h-full rounded-full bg-sage-600"
+            />
+          </View>
+
+          <Pressable
+            onPress={() => {
+              if (!enabled) setEnabled(true);
+              setVolume(volume + 10);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Subir volumen"
+            className="h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface active:bg-surface-sunk cursor-pointer"
+          >
+            <Text className="text-base font-extrabold text-ink-soft">+</Text>
+          </Pressable>
+        </View>
+
+        {/* Niveles rápidos de volumen */}
+        <View className="flex-row flex-wrap gap-1.5">
+          {VOLUMEN_PRESETS.map((pct) => {
+            const activo = enabled && volume === pct;
+            return (
+              <Pressable
+                key={pct}
+                onPress={() => {
+                  if (!enabled) setEnabled(true);
+                  setVolume(pct);
+                }}
+                className={[
+                  "flex-1 items-center justify-center rounded-xl border py-1.5 cursor-pointer",
+                  activo
+                    ? "border-sage-600 bg-sage-600"
+                    : "border-line bg-surface active:bg-surface-sunk",
+                ].join(" ")}
+              >
+                <Text
+                  className={[
+                    "text-xs font-bold",
+                    activo ? "text-white" : "text-ink-soft",
+                  ].join(" ")}
+                >
+                  {pct}%
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Botones para probar ambos sonidos */}
+        <View className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-2">
+          <Pressable
+            onPress={() => playMessageSound({ force: true })}
+            accessibilityRole="button"
+            className="flex-row items-center justify-center gap-2 rounded-xl border border-sage-200 bg-sage-50 px-3 py-2.5 active:bg-sage-100 cursor-pointer"
+          >
+            <Icon name="message" size={14} className="text-sage-700" />
+            <Text className="text-xs font-extrabold text-sage-800">
+              Probar sonido de mensaje
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => playVentaSound({ force: true })}
+            accessibilityRole="button"
+            className="flex-row items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 active:bg-amber-100 cursor-pointer"
+          >
+            <Icon name="tag" size={14} className="text-amber-800" />
+            <Text className="text-xs font-extrabold text-amber-900">
+              Probar sonido de venta
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    </Card>
   );
 }

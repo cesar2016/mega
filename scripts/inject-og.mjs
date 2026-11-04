@@ -45,6 +45,18 @@ if (fs.existsSync(iconsSrcDir)) {
   }
 }
 
+const soundSrcDir = path.join(publicDir, "sound");
+const soundDestDir = path.join(distDir, "sound");
+if (fs.existsSync(soundSrcDir)) {
+  fs.mkdirSync(soundDestDir, { recursive: true });
+  for (const soundFile of fs.readdirSync(soundSrcDir)) {
+    fs.copyFileSync(
+      path.join(soundSrcDir, soundFile),
+      path.join(soundDestDir, soundFile)
+    );
+  }
+}
+
 let html = fs.readFileSync(indexPath, "utf8");
 
 const metaTags = `

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase, isSupabaseConfigured } from "lib/supabase";
 import { detectarDatosContacto } from "lib/contactFilter";
 import { enviarPushRemoto, mostrarNotificacionSistema } from "lib/pushNotifications";
+import { playMessageSound } from "lib/sound";
 import { maskNombreUsuario, showToast } from "lib/utils";
 import { useAuthStore } from "store/authStore";
 import { useNotificacionesStore } from "store/notificacionesStore";
@@ -76,6 +77,7 @@ function notificarMensajeEntrante(cuerpo?: string | null, id?: string) {
     cuerpo && cuerpo.length > 55
       ? `${cuerpo.slice(0, 55)}…`
       : cuerpo || "Tenés una nueva respuesta";
+  playMessageSound();
   showToast(`Nuevo mensaje en el chat: «${extracto}»`, "info");
 
   if (typeof document !== "undefined" && document.visibilityState === "hidden") {

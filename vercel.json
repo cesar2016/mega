@@ -47,6 +47,10 @@
       "destination": "/icons/$1"
     },
     {
+      "source": "/sound/(.*)",
+      "destination": "/sound/$1"
+    },
+    {
       "source": "/oferta/:id",
       "destination": "/api/oferta?id=:id"
     },

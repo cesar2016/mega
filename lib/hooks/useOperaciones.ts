@@ -1,5 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase, isSupabaseConfigured } from "lib/supabase";
+import { mostrarNotificacionSistema } from "lib/pushNotifications";
+import { playVentaSound } from "lib/sound";
+import { showToast } from "lib/utils";
 import { useNotificacionesStore } from "store/notificacionesStore";
 import type { OfertaMediaRow } from "components/ui/OfertaMedia";
 import { OFERTA_MEDIA_SELECT } from "./useOfferDB";
@@ -40,11 +44,72 @@ export interface Operacion {
   } | null;
 }
 
+let usuarioOperacionesInitId: string | null = null;
+const ventasConocidasIds = new Set<string>();
+const ventasNotificadasIds = new Set<string>();
+
+function notificarNuevaVentaRodeo(op: Partial<Operacion>) {
+  if (op.id) {
+    if (ventasNotificadasIds.has(op.id)) return;
+    ventasNotificadasIds.add(op.id);
+  }
+  playVentaSound();
+  const cat = op.categoria || "hacienda";
+  const cant = op.cantidad ? ` (${op.cantidad} cab.)` : "";
+  showToast(`🐮 ¡Vendiste tu lote de ${cat}${cant}!`, "success");
+
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+    void mostrarNotificacionSistema({
+      title: `🐮 ¡Vendiste tu lote de ${cat}!`,
+      body: `${op.comprador_nombre || "Un comprador"} adquirió tu lote${cant}.`,
+      url: "/(main)/tabs/operaciones?tab=ventas",
+      tag: op.id ? `venta-${op.id}` : "venta-rodeo",
+    });
+  }
+}
+
 export function useMisOperaciones(userId?: string) {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !userId) return;
+
+    const sufijo = Math.random().toString(36).slice(2, 8);
+    const channel = supabase
+      .channel(`operaciones-usuario-${userId}-${sufijo}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "operaciones" },
+        (payload) => {
+          const nueva = payload.new as Partial<Operacion> | undefined;
+          if (nueva?.id && nueva.vendedor_id === userId) {
+            ventasConocidasIds.add(nueva.id);
+            notificarNuevaVentaRodeo(nueva);
+          }
+          if (
+            nueva?.vendedor_id === userId ||
+            nueva?.comprador_id === userId
+          ) {
+            queryClient.invalidateQueries({ queryKey: ["mis_operaciones"] });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient, userId]);
+
   return useQuery({
     queryKey: ["mis_operaciones", userId],
     queryFn: async () => {
       if (!userId) return { ventas: [], compras: [], todas: [] };
+
+      if (usuarioOperacionesInitId && usuarioOperacionesInitId !== userId) {
+        ventasConocidasIds.clear();
+        usuarioOperacionesInitId = null;
+      }
 
       const { data, error } = await supabase
         .from("operaciones")
@@ -73,6 +138,17 @@ export function useMisOperaciones(userId?: string) {
       const ventas = todas.filter((op) => op.vendedor_id === userId);
       const compras = todas.filter((op) => op.comprador_id === userId);
 
+      const esCargaInicial = usuarioOperacionesInitId !== userId;
+      for (const v of ventas) {
+        if (!esCargaInicial && !ventasConocidasIds.has(v.id)) {
+          ventasConocidasIds.add(v.id);
+          notificarNuevaVentaRodeo(v);
+        } else {
+          ventasConocidasIds.add(v.id);
+        }
+      }
+      usuarioOperacionesInitId = userId;
+
       return {
         todas,
         ventas,
@@ -80,7 +156,7 @@ export function useMisOperaciones(userId?: string) {
       };
     },
     enabled: Boolean(userId) && isSupabaseConfigured,
-    refetchInterval: 30000,
+    refetchInterval: 15000,
   });
 }
 
@@ -111,4 +187,3 @@ export function useOperacionesSinVer(userId?: string) {
     apagarOperacion: (id: string) => marcarOperacionesVistas([id]),
   };
 }
-
