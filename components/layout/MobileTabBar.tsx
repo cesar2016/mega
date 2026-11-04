@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -6,6 +6,7 @@ import { useAuthStore } from "store/authStore";
 import { useMatches, usePendientesMatch } from "lib/hooks/useMatches";
 import { marcarConversacionLeida, useConversaciones, useMensajesSinLeer } from "lib/hooks/useChat";
 import { useOperacionesSinVer } from "lib/hooks/useOperaciones";
+import { actualizarBadgeIconoApp } from "lib/pushNotifications";
 import { isSuperAdmin } from "lib/superAdmin";
 import { useNotificacionesStore } from "store/notificacionesStore";
 import { Icon } from "components/ui/Icon";
@@ -23,12 +24,20 @@ export function MobileTabBar({ state, descriptors, navigation }: BottomTabBarPro
   const profile = useAuthStore((state) => state.profile);
   const esAdmin = isSuperAdmin(profile, user);
   const { data: matchesData } = useMatches({ enabled: !!profile });
+  const pendientes = usePendientesMatch({ enabled: !!profile });
   const { data: convsData } = useConversaciones({ enabled: !!profile });
-  const { apagarTodas: apagarOperaciones } = useOperacionesSinVer(profile?.id);
+  const mensajesSinLeer = useMensajesSinLeer({ enabled: !!profile });
+  const { totalSinVer: totalOperaciones, apagarTodas: apagarOperaciones } =
+    useOperacionesSinVer(profile?.id);
   const marcarMatchesVistos = useNotificacionesStore((s) => s.marcarMatchesVistos);
   const marcarTodasConversacionesVistas = useNotificacionesStore(
     (s) => s.marcarTodasConversacionesVistas
   );
+
+  const totalAvisos = (pendientes || 0) + (mensajesSinLeer || 0) + (totalOperaciones || 0);
+  useEffect(() => {
+    actualizarBadgeIconoApp(totalAvisos);
+  }, [totalAvisos]);
 
   return (
     <View
@@ -162,6 +171,11 @@ export function StandaloneMobileTabBar({
   const marcarTodasConversacionesVistas = useNotificacionesStore(
     (s) => s.marcarTodasConversacionesVistas
   );
+
+  const totalAvisos = (pendientes || 0) + (mensajesSinLeer || 0) + (totalOperaciones || 0);
+  useEffect(() => {
+    actualizarBadgeIconoApp(totalAvisos);
+  }, [totalAvisos]);
 
   return (
     <View

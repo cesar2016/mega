@@ -13,8 +13,7 @@ const SUPABASE_URL =
 
 const SUPABASE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtrb2N0bXZnbGhqYXlqdGllcGdoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MjE2NDAsImV4cCI6MjA5MjE5NzY0MH0.N7-m8bQ3kY1Z3Uv_mO2-R4r6J5kY7pW9xQ0vB2nC4eA";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtrb2N0bXZnbGhqYXlqdGllcGdoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjE3MTA3MCwiZXhwIjoyMTA3NzQ3MDcwfQ.rSyZGjmQot2u1Hz8IHWUPxE9kTIuo4F75-FOBp8JDUg";
 
 const VAPID_PUBLIC_KEY =
   process.env.EXPO_PUBLIC_VAPID_PUBLIC_KEY ||
@@ -36,7 +35,65 @@ if (webpush) {
   }
 }
 
-async function enviarPushAUsuario({ userId, title, body, url = "/", tag = "mega-notif" }) {
+async function registrarSuscripcionBackend({ userId, endpoint, p256dh, auth, userAgent }) {
+  if (!userId || !endpoint || !p256dh || !auth) {
+    return { ok: false, error: "Datos de suscripción incompletos" };
+  }
+
+  const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/registrar_push_subscription`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      p_user_id: userId,
+      p_endpoint: endpoint,
+      p_p256dh: p256dh,
+      p_auth: auth,
+      p_user_agent: userAgent || null,
+    }),
+  });
+
+  if (rpcRes.ok) {
+    return { ok: true };
+  }
+
+  // Fallback directo con service_role sobre la tabla push_subscriptions
+  const upsertRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/push_subscriptions?on_conflict=endpoint`,
+    {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        endpoint,
+        p256dh,
+        auth,
+        user_agent: userAgent || null,
+        updated_at: new Date().toISOString(),
+      }),
+    }
+  );
+
+  return { ok: upsertRes.ok, status: upsertRes.status };
+}
+
+async function enviarPushAUsuario({
+  userId,
+  title,
+  body,
+  url = "/",
+  tag = "mega-notif",
+  soundType = "message",
+  badgeCount = 1,
+}) {
   if (!webpush || !userId) {
     return { sent: 0, error: "web-push no disponible o sin userId" };
   }
@@ -68,6 +125,9 @@ async function enviarPushAUsuario({ userId, title, body, url = "/", tag = "mega-
     body: body || "Tenés una nueva notificación",
     url,
     tag,
+    soundType,
+    badgeCount: Number(badgeCount) > 0 ? Number(badgeCount) : 1,
+    timestamp: Date.now(),
   });
 
   let enviados = 0;
@@ -107,7 +167,7 @@ async function enviarPushAUsuario({ userId, title, body, url = "/", tag = "mega-
     })
   );
 
-  return { sent: enviados };
+  return { sent: enviados, totalSubs: subs.length };
 }
 
 module.exports = async function handler(req, res) {
@@ -125,10 +185,38 @@ module.exports = async function handler(req, res) {
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
-    const { user_id, title, message, body: bodyText, url, tag } = body;
+
+    // Acción 1: Registrar/actualizar suscripción del dispositivo para el usuario activo
+    if (body.action === "subscribe") {
+      const subRes = await registrarSuscripcionBackend({
+        userId: body.user_id,
+        endpoint: body.endpoint,
+        p256dh: body.p256dh,
+        auth: body.auth,
+        userAgent: body.user_agent,
+      });
+      return res.status(200).json(subRes);
+    }
+
+    // Acción 2: Enviar notificación Web Push al destinatario
+    const {
+      user_id,
+      title,
+      message,
+      body: bodyText,
+      url,
+      tag,
+      soundType,
+      badgeCount,
+      delay_ms,
+    } = body;
 
     if (!user_id) {
       return res.status(400).json({ error: "user_id requerido" });
+    }
+
+    if (delay_ms && Number(delay_ms) > 0 && Number(delay_ms) <= 8000) {
+      await new Promise((r) => setTimeout(r, Number(delay_ms)));
     }
 
     const result = await enviarPushAUsuario({
@@ -137,6 +225,8 @@ module.exports = async function handler(req, res) {
       body: bodyText || message || "Tenés una nueva notificación",
       url: url || "/",
       tag: tag || `mega-${Date.now()}`,
+      soundType: soundType || "message",
+      badgeCount: badgeCount || 1,
     });
 
     return res.status(200).json({ ok: true, ...result });

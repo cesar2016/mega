@@ -7,6 +7,7 @@ import { useAuthStore, UserRol } from "store/authStore";
 import { useAuthRedirect } from "lib/hooks/useAuthRedirect";
 import { useMisOperaciones, useOperacionesSinVer } from "lib/hooks/useOperaciones";
 import { playMessageSound, playVentaSound, useSoundStore } from "lib/sound";
+import { enviarPushRemoto, sincronizarSuscripcionPush } from "lib/pushNotifications";
 import { isSuperAdmin } from "lib/superAdmin";
 import {
   formatCuit,
@@ -695,8 +696,34 @@ export default function PerfilScreen() {
 }
 
 function ConfiguracionSonidosCard() {
+  const user = useAuthStore((state) => state.user);
   const { enabled, volume, setEnabled, setVolume } = useSoundStore();
+  const [testingPush, setTestingPush] = useState(false);
   const VOLUMEN_PRESETS = [20, 40, 60, 80, 100];
+
+  const handleProbarPushSegundoPlano = async () => {
+    if (!user?.id || testingPush) return;
+    setTestingPush(true);
+    try {
+      await sincronizarSuscripcionPush(user.id);
+      showToast(
+        "Cerrá o minimizá la app ahora: en 5 segundos recibirás la notificación Push con sonido y badge.",
+        "success"
+      );
+      enviarPushRemoto({
+        userId: user.id,
+        title: "🐮 Prueba de Notificación Push",
+        body: "Notificación en segundo plano con sonido y badge en el ícono de la app.",
+        url: "/(main)/tabs/perfil",
+        tag: `test-push-${Date.now()}`,
+        soundType: "venta",
+        badgeCount: 1,
+        delayMs: 5000,
+      });
+    } finally {
+      setTimeout(() => setTestingPush(false), 5500);
+    }
+  };
 
   return (
     <Card className="gap-4 border border-line-soft bg-surface">
@@ -866,6 +893,21 @@ function ConfiguracionSonidosCard() {
             </Text>
           </Pressable>
         </View>
+
+        {/* Botón para probar notificación Push real con la app cerrada */}
+        <Pressable
+          onPress={() => void handleProbarPushSegundoPlano()}
+          disabled={testingPush}
+          accessibilityRole="button"
+          className="flex-row items-center justify-center gap-2 rounded-xl border border-sage-700 bg-sage-800 px-3 py-2.5 active:bg-sage-900 cursor-pointer"
+        >
+          <Icon name="sparkles" size={14} className="text-white" />
+          <Text className="text-xs font-extrabold text-white">
+            {testingPush
+              ? "Enviando Push en 5 seg... (cerrá o minimizá la app)"
+              : "Probar notificación Push (con app cerrada en 5 seg)"}
+          </Text>
+        </Pressable>
       </View>
     </Card>
   );

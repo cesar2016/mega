@@ -643,6 +643,8 @@ module.exports = async function handler(req, res) {
             body: `${comprador.nombre} confirmó la compra (${oferta.cantidad} cab.). Tocá para ver sus datos de contacto.`,
             url: "/(main)/tabs/operaciones?tab=ventas",
             tag: `venta-${oferta.id}`,
+            soundType: "venta",
+            badgeCount: 1,
           });
         }
         if (compradorId) {
@@ -652,6 +654,8 @@ module.exports = async function handler(req, res) {
             body: `Adquiriste el lote de ${vendedor.nombre}. Tocá para ver los datos del productor.`,
             url: "/(main)/tabs/operaciones?tab=compras",
             tag: `compra-${oferta.id}`,
+            soundType: "venta",
+            badgeCount: 1,
           });
         }
       } catch (pushErr) {

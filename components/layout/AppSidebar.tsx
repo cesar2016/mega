@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 import { usePathname, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -7,6 +7,7 @@ import { showToast } from "lib/utils";
 import { useMatches, usePendientesMatch } from "lib/hooks/useMatches";
 import { marcarConversacionLeida, useConversaciones, useMensajesSinLeer } from "lib/hooks/useChat";
 import { useOperacionesSinVer } from "lib/hooks/useOperaciones";
+import { actualizarBadgeIconoApp } from "lib/pushNotifications";
 import { isSuperAdmin } from "lib/superAdmin";
 import { useNotificacionesStore } from "store/notificacionesStore";
 import { Icon } from "components/ui/Icon";
@@ -47,6 +48,11 @@ export function AppSidebar() {
   const marcarTodasConversacionesVistas = useNotificacionesStore(
     (s) => s.marcarTodasConversacionesVistas
   );
+
+  useEffect(() => {
+    const totalAvisos = (mensajesSinLeer || 0) + (totalOperaciones || 0) + (pendientes || 0);
+    void actualizarBadgeIconoApp(totalAvisos);
+  }, [mensajesSinLeer, totalOperaciones, pendientes]);
 
   return (
     <View className="h-full w-[264px] shrink-0 border-r border-line-soft bg-surface px-4 py-6">
