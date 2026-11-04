@@ -105,12 +105,14 @@ export function resolverCoordenadas(
 
 export type FiltrosOfertaState = {
   categoria: string;
+  precioMin: string;
   precioMax: string;
   radioKm: string;
 };
 
 export const FILTROS_OFERTA_INICIAL: FiltrosOfertaState = {
   categoria: "",
+  precioMin: "",
   precioMax: "",
   radioKm: "",
 };
@@ -121,7 +123,10 @@ export function filtrarOfertas(
   origenUsuario?: { localidad?: string | null; provincia?: string | null } | null
 ): OfertaResumen[] {
   const catFiltro = filtros.categoria.trim().toLowerCase();
-  const precioMaxNum = filtros.precioMax.trim() ? Number(filtros.precioMax.replace(/[^0-9.]/g, "")) : null;
+  const precioMinStr = (filtros.precioMin ?? "").trim();
+  const precioMaxStr = (filtros.precioMax ?? "").trim();
+  const precioMinNum = precioMinStr ? Number(precioMinStr.replace(/[^0-9.]/g, "")) : null;
+  const precioMaxNum = precioMaxStr ? Number(precioMaxStr.replace(/[^0-9.]/g, "")) : null;
   const radioKmNum = filtros.radioKm.trim() ? Number(filtros.radioKm.replace(/[^0-9.]/g, "")) : null;
 
   const puntoOrigen =
@@ -134,9 +139,15 @@ export function filtrarOfertas(
       return false;
     }
 
-    // 2. Precio máximo
+    // 2. Rango de precio (Entre precioMin y precioMax)
+    const precioOferta = Number(oferta.precio ?? 0);
+    if (precioMinNum != null && !Number.isNaN(precioMinNum) && precioMinNum > 0) {
+      if (precioOferta < precioMinNum) {
+        return false;
+      }
+    }
     if (precioMaxNum != null && !Number.isNaN(precioMaxNum) && precioMaxNum > 0) {
-      if (Number(oferta.precio ?? 0) > precioMaxNum) {
+      if (precioOferta > precioMaxNum) {
         return false;
       }
     }
@@ -172,7 +183,10 @@ export function OfertasFilterBar({
   totalSinFiltrar: number;
 }) {
   const hayFiltrosActivos = Boolean(
-    filtros.categoria || filtros.precioMax.trim() || filtros.radioKm.trim()
+    filtros.categoria ||
+      (filtros.precioMin ?? "").trim() ||
+      (filtros.precioMax ?? "").trim() ||
+      filtros.radioKm.trim()
   );
 
   const limpiar = () => onChange(FILTROS_OFERTA_INICIAL);
@@ -187,7 +201,7 @@ export function OfertasFilterBar({
           <View>
             <Text className="text-sm font-extrabold text-ink">Filtrar ofertas</Text>
             <Text className="text-[11px] text-ink-muted">
-              Buscá lotes por categoría de animales, precio y radio (km)
+              Buscá lotes por categoría de animales, rango de precio y radio (km)
             </Text>
           </View>
         </View>
@@ -263,30 +277,53 @@ export function OfertasFilterBar({
         </View>
       </View>
 
-      {/* 2. Precio y 3. Radio (km) */}
+      {/* 2. Rango de Precio (Entre ... y ...) y 3. Radio (km) */}
       <View className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        {/* Filtro Precio */}
+        {/* Filtro Precio (Rango con 2 inputs: Entre ... y ...) */}
         <View className="gap-1.5">
           <Text className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">
-            Precio máximo ($)
+            Precio (Rango: Entre $ y $)
           </Text>
-          <View className="flex-row items-center gap-2 rounded-xl border border-line bg-surface-soft px-3 py-2">
-            <Icon name="coins" size={16} className="text-sage-700" />
-            <TextInput
-              value={filtros.precioMax}
-              onChangeText={(t) =>
-                onChange({ ...filtros, precioMax: t.replace(/[^0-9]/g, "") })
-              }
-              placeholder="Ej: 3500 o 950000 (sin límite)"
-              placeholderTextColor="#8C978E"
-              keyboardType="numeric"
-              className="flex-1 text-xs font-semibold text-ink outline-none"
-            />
-            {filtros.precioMax ? (
-              <Pressable onPress={() => onChange({ ...filtros, precioMax: "" })}>
-                <Icon name="x" size={14} className="text-ink-muted" />
-              </Pressable>
-            ) : null}
+          <View className="flex-row items-center gap-2">
+            <View className="flex-1 flex-row items-center gap-1.5 rounded-xl border border-line bg-surface-soft px-3 py-2">
+              <Text className="text-xs font-bold text-ink-muted">Entre $</Text>
+              <TextInput
+                value={filtros.precioMin}
+                onChangeText={(t) =>
+                  onChange({ ...filtros, precioMin: t.replace(/[^0-9]/g, "") })
+                }
+                placeholder="Mínimo"
+                placeholderTextColor="#8C978E"
+                keyboardType="numeric"
+                className="min-w-0 flex-1 text-xs font-semibold text-ink outline-none"
+              />
+              {filtros.precioMin ? (
+                <Pressable onPress={() => onChange({ ...filtros, precioMin: "" })}>
+                  <Icon name="x" size={14} className="text-ink-muted" />
+                </Pressable>
+              ) : null}
+            </View>
+
+            <Text className="text-xs font-bold text-ink-muted">y</Text>
+
+            <View className="flex-1 flex-row items-center gap-1.5 rounded-xl border border-line bg-surface-soft px-3 py-2">
+              <Text className="text-xs font-bold text-ink-muted">$</Text>
+              <TextInput
+                value={filtros.precioMax}
+                onChangeText={(t) =>
+                  onChange({ ...filtros, precioMax: t.replace(/[^0-9]/g, "") })
+                }
+                placeholder="Máximo"
+                placeholderTextColor="#8C978E"
+                keyboardType="numeric"
+                className="min-w-0 flex-1 text-xs font-semibold text-ink outline-none"
+              />
+              {filtros.precioMax ? (
+                <Pressable onPress={() => onChange({ ...filtros, precioMax: "" })}>
+                  <Icon name="x" size={14} className="text-ink-muted" />
+                </Pressable>
+              ) : null}
+            </View>
           </View>
         </View>
 
