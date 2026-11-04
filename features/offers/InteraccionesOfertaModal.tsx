@@ -91,14 +91,16 @@ export function InteraccionesOfertaModal({
               className={[
                 "flex-1 flex-row items-center justify-center gap-2 rounded-2xl py-2.5 px-3",
                 tab === "likes"
-                  ? "bg-clay-500 shadow-xs"
+                  ? "bg-red-600 shadow-xs"
                   : "bg-surface border border-line-soft",
               ].join(" ")}
             >
               <Icon
                 name="heart"
                 size={15}
-                className={tab === "likes" ? "text-white" : "text-clay-600"}
+                color={tab === "likes" ? "#FFFFFF" : "#DC2626"}
+                fill={tab === "likes" ? "#FFFFFF" : "#DC2626"}
+                className={tab === "likes" ? "text-white" : "text-red-600"}
               />
               <Text
                 className={[

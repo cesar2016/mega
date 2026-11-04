@@ -536,19 +536,21 @@ export default function OfferDetailScreen() {
                     className={[
                       "flex-row items-center gap-1.5 rounded-xl border px-3 py-1.5 active:opacity-80 cursor-pointer",
                       likedByMe
-                        ? "border-clay-300 bg-clay-50"
+                        ? "border-red-300 bg-red-50"
                         : "border-line-soft bg-surface-soft",
                     ].join(" ")}
                   >
                     <Icon
                       name="heart"
                       size={15}
-                      className={likedByMe ? "text-clay-600" : "text-ink-muted"}
+                      color={likedByMe ? "#DC2626" : undefined}
+                      fill={likedByMe ? "#DC2626" : "none"}
+                      className={likedByMe ? "text-red-600" : "text-ink-muted"}
                     />
                     <Text
                       className={[
                         "text-xs font-bold",
-                        likedByMe ? "text-clay-700" : "text-ink",
+                        likedByMe ? "text-red-600" : "text-ink",
                       ].join(" ")}
                     >
                       {likedByMe ? "Te gusta" : "Me gusta"}
@@ -562,12 +564,27 @@ export default function OfferDetailScreen() {
                     }}
                     accessibilityRole="button"
                     accessibilityLabel="Ver listado público de Me gusta"
-                    className="flex-row items-center gap-1 rounded-xl border border-line-soft bg-surface-soft px-2.5 py-1.5 active:bg-surface-sunk cursor-pointer"
+                    className={[
+                      "flex-row items-center gap-1 rounded-xl border px-2.5 py-1.5 active:bg-surface-sunk cursor-pointer",
+                      likedByMe
+                        ? "border-red-300 bg-red-50"
+                        : "border-line-soft bg-surface-soft",
+                    ].join(" ")}
                   >
-                    <Text className="text-xs font-extrabold text-ink">
+                    <Text
+                      className={[
+                        "text-xs font-extrabold",
+                        likedByMe ? "text-red-600" : "text-ink",
+                      ].join(" ")}
+                    >
                       {likesCount}
                     </Text>
-                    <Text className="text-xs text-ink-muted">
+                    <Text
+                      className={[
+                        "text-xs",
+                        likedByMe ? "text-red-600" : "text-ink-muted",
+                      ].join(" ")}
+                    >
                       {likesCount === 1 ? "favorito" : "favoritos"}
                     </Text>
                   </Pressable>

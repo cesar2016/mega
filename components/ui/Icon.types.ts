@@ -83,4 +83,5 @@ export type IconProps = {
   className?: string;
   strokeWidth?: number;
   color?: string;
+  fill?: string;
 };

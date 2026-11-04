@@ -7,7 +7,7 @@ export type { IconName } from "./Icon.types";
  * Renderiza un icono de Lucide. El color y el tamaño se controlan con
  * clases de Tailwind (`className="text-sage-500"`) y con `size`.
  */
-export function Icon({ name, size = 20, className, strokeWidth = 2, color }: IconProps) {
+export function Icon({ name, size = 20, className, strokeWidth = 2, color, fill }: IconProps) {
   const Component = iconRegistry[name];
   return (
     <Component
@@ -15,6 +15,7 @@ export function Icon({ name, size = 20, className, strokeWidth = 2, color }: Ico
       className={className}
       strokeWidth={strokeWidth}
       color={color}
+      fill={fill}
     />
   );
 }

@@ -273,19 +273,21 @@ export function OfferCard({
                   className={[
                     "flex-row items-center gap-1.5 rounded-xl border px-2.5 py-1.5 active:opacity-80",
                     likedByMe
-                      ? "border-clay-300 bg-clay-50"
+                      ? "border-red-300 bg-red-50"
                       : "border-line-soft bg-surface",
                   ].join(" ")}
                 >
                   <Icon
                     name="heart"
                     size={14}
-                    className={likedByMe ? "text-clay-600" : "text-ink-muted"}
+                    color={likedByMe ? "#DC2626" : undefined}
+                    fill={likedByMe ? "#DC2626" : "none"}
+                    className={likedByMe ? "text-red-600" : "text-ink-muted"}
                   />
                   <Text
                     className={[
                       "text-xs font-bold",
-                      likedByMe ? "text-clay-700" : "text-ink-soft",
+                      likedByMe ? "text-red-600" : "text-ink-soft",
                     ].join(" ")}
                   >
                     Me gusta
@@ -300,9 +302,19 @@ export function OfferCard({
                   }}
                   accessibilityRole="button"
                   accessibilityLabel="Ver listado de Me gusta"
-                  className="rounded-xl bg-surface px-2.5 py-1.5 border border-line-soft active:bg-surface-sunk"
+                  className={[
+                    "rounded-xl px-2.5 py-1.5 border active:bg-surface-sunk",
+                    likedByMe
+                      ? "border-red-300 bg-red-50"
+                      : "border-line-soft bg-surface",
+                  ].join(" ")}
                 >
-                  <Text className="text-xs font-extrabold text-ink">
+                  <Text
+                    className={[
+                      "text-xs font-extrabold",
+                      likedByMe ? "text-red-600" : "text-ink",
+                    ].join(" ")}
+                  >
                     {likesCount}
                   </Text>
                 </Pressable>
