@@ -7,27 +7,28 @@ export default function Root({ children }: PropsWithChildren) {
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-        <title>Mercado Ganadero</title>
-        <meta name="description" content="Mercado Ganadero: plataforma digital para la compra y venta de hacienda en Argentina." />
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
+        />
+        <title>Mercado Ganadero — Compra y venta de hacienda</title>
+        <meta
+          name="description"
+          content="Compra y venta directa de hacienda y lotes ganaderos en Argentina."
+        />
 
-        {/* Open Graph por defecto para Facebook, WhatsApp, etc. */}
-        <meta property="og:type" content="website" />
-        <meta property="og:site_name" content="Mercado Ganadero" />
-        <meta property="og:url" content="https://mercadoganadero.app/" />
-        <meta property="og:title" content="Mercado Ganadero · Compra y venta de hacienda" />
-        <meta property="og:description" content="Plataforma digital para la compra y venta de hacienda en Argentina. Publicá tus lotes, conectá con compradores directos y gestioná tus operaciones de forma simple." />
-        <meta property="og:image" content="https://mercadoganadero.app/og-banner-v2.jpg" />
-        <meta property="og:image:secure_url" content="https://mercadoganadero.app/og-banner-v2.jpg" />
-        <meta property="og:image:type" content="image/jpeg" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
+        {/* Configuración PWA */}
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#2E5A3C" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="application-name" content="Mercado Ganadero" />
 
-        {/* Twitter */}
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Mercado Ganadero · Compra y venta de hacienda" />
-        <meta name="twitter:description" content="Plataforma digital para la compra y venta de hacienda en Argentina." />
-        <meta name="twitter:image" content="https://mercadoganadero.app/og-banner-v2.jpg" />
+        {/* Configuración iOS / Safari Standalone App */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Mercado Ganadero" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
 
         <ScrollViewStyleReset />
       </head>

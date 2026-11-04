@@ -5,6 +5,7 @@ import { View } from "react-native";
 import { Stack } from "expo-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { supabase, isSupabaseConfigured } from "lib/supabase";
+import { registerPwaServiceWorker } from "lib/pwa";
 import { useRegistrarVisitaSitio } from "lib/superAdmin";
 import { useAuthStore } from "store/authStore";
 import { ToastHost } from "components/ui/Toast";
@@ -21,6 +22,10 @@ export default function RootLayout() {
   const profile = useAuthStore((state) => state.profile);
 
   useRegistrarVisitaSitio(user, profile);
+
+  useEffect(() => {
+    registerPwaServiceWorker();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

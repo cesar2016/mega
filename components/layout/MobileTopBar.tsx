@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { useAuthStore } from "store/authStore";
 import { Icon } from "components/ui/Icon";
 import { Logo } from "components/ui/Logo";
+import { InstallAppButton } from "components/pwa/InstallAppButton";
 import type { IconName } from "components/ui/Icon.types";
 
 /** Barra superior compacta: sólo mobile. En escritorio la reemplaza el sidebar. */
@@ -24,7 +25,7 @@ export function MobileTopBar({
   const profile = useAuthStore((state) => state.profile);
 
   return (
-    <View className="z-20 flex-row items-center gap-3 border-b border-line-soft bg-surface/95 backdrop-blur-sm px-4 py-3 md:hidden">
+    <View className="z-20 flex-row items-center gap-2.5 border-b border-line-soft bg-surface/95 backdrop-blur-sm px-4 py-3 md:hidden">
       {onBack ? (
         <Pressable
           onPress={onBack}
@@ -53,6 +54,8 @@ export function MobileTopBar({
           {profile?.nombre ? `Hola, ${profile.nombre}` : "Compra y venta de hacienda"}
         </Text>
       </View>
+
+      <InstallAppButton variant="compact" />
 
       {action ? (
         <Pressable

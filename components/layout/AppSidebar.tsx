@@ -12,6 +12,7 @@ import { useNotificacionesStore } from "store/notificacionesStore";
 import { Icon } from "components/ui/Icon";
 import { Avatar } from "components/ui/Avatar";
 import { Logo } from "components/ui/Logo";
+import { InstallAppButton } from "components/pwa/InstallAppButton";
 import { activeNavItem, getVisibleNavItems } from "./navItems";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -148,6 +149,8 @@ export function AppSidebar() {
       </View>
 
       <View className="flex-1" />
+
+      <InstallAppButton variant="sidebar" />
 
       {/* Acción principal */}
       <Pressable
