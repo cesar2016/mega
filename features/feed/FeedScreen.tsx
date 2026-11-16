@@ -30,6 +30,7 @@ export default function FeedScreen() {
   const { width } = useResponsive();
 
   const columns = width >= 1280 ? 3 : width >= 640 ? 2 : 1;
+  const tabsApilados = width < 768;
 
   const [tabEstado, setTabEstado] = useState<"activas" | "vendidas" | "todas">("activas");
   const [filtros, setFiltros] = useState<FiltrosOfertaState>(FILTROS_OFERTA_INICIAL);
@@ -174,73 +175,136 @@ export default function FeedScreen() {
         }
       >
         {/* Selector de Sección: Disponibles / Vendidos / Todos */}
-        <View className="flex-row items-center gap-2 rounded-2xl bg-surface-soft p-1.5 border border-line-soft">
+        <View className="flex-row items-stretch gap-1.5 rounded-2xl border border-line-soft bg-surface-soft p-1.5">
           <Pressable
             onPress={() => setTabEstado("activas")}
             accessibilityRole="tab"
             accessibilityState={{ selected: tabEstado === "activas" }}
-            className={`flex-1 flex-row items-center justify-center gap-2 rounded-xl py-2.5 px-3 transition-all cursor-pointer ${
+            className={`min-w-0 flex-1 items-center justify-center rounded-xl px-1 py-2 transition-all cursor-pointer ${
               tabEstado === "activas"
-                ? "bg-surface shadow-xs border border-line"
+                ? "border border-line bg-surface shadow-soft"
                 : "opacity-70 active:opacity-100"
             }`}
           >
-            <View className="h-2 w-2 rounded-full bg-emerald-500" />
-            <Text
-              className={`text-xs font-bold ${
-                tabEstado === "activas" ? "text-ink" : "text-ink-muted"
+            <View
+              className={`items-center justify-center gap-1 ${
+                tabsApilados ? "flex-col" : "flex-row flex-wrap"
               }`}
             >
-              Disponibles ({listaActivas.length})
-            </Text>
+              <View className="min-w-0 shrink flex-row items-center justify-center gap-1">
+                <View className="h-2 w-2 rounded-full bg-emerald-500" />
+                <Text
+                  className={`shrink text-center text-[11px] font-bold leading-tight ${
+                    tabEstado === "activas" ? "text-ink" : "text-ink-muted"
+                  }`}
+                >
+                  Disponibles
+                </Text>
+              </View>
+              <View
+                className={`min-w-[22px] items-center rounded-full px-1.5 py-0.5 ${
+                  tabEstado === "activas" ? "bg-emerald-100" : "bg-surface/80"
+                }`}
+              >
+                <Text
+                  className={`text-[10px] font-bold leading-3 ${
+                    tabEstado === "activas" ? "text-emerald-800" : "text-ink-muted"
+                  }`}
+                >
+                  {listaActivas.length}
+                </Text>
+              </View>
+            </View>
           </Pressable>
 
           <Pressable
             onPress={() => setTabEstado("vendidas")}
             accessibilityRole="tab"
             accessibilityState={{ selected: tabEstado === "vendidas" }}
-            className={`flex-1 flex-row items-center justify-center gap-2 rounded-xl py-2.5 px-3 transition-all cursor-pointer ${
+            className={`min-w-0 flex-1 items-center justify-center rounded-xl px-1 py-2 transition-all cursor-pointer ${
               tabEstado === "vendidas"
-                ? "bg-surface shadow-xs border border-line"
+                ? "border border-line bg-surface shadow-soft"
                 : "opacity-70 active:opacity-100"
             }`}
           >
-            <Icon
-              name="badgeCheck"
-              size={15}
-              className={tabEstado === "vendidas" ? "text-amber-700" : "text-ink-muted"}
-            />
-            <Text
-              className={`text-xs font-bold ${
-                tabEstado === "vendidas" ? "text-amber-800" : "text-ink-muted"
+            <View
+              className={`items-center justify-center gap-1 ${
+                tabsApilados ? "flex-col" : "flex-row flex-wrap"
               }`}
             >
-              Lotes vendidos ({listaVendidas.length})
-            </Text>
+              <View className="min-w-0 shrink flex-row items-center justify-center gap-1">
+                <Icon
+                  name="badgeCheck"
+                  size={14}
+                  className={tabEstado === "vendidas" ? "text-amber-700" : "text-ink-muted"}
+                />
+                <Text
+                  className={`shrink text-center text-[11px] font-bold leading-tight ${
+                    tabEstado === "vendidas" ? "text-amber-800" : "text-ink-muted"
+                  }`}
+                >
+                  Lotes vendidos
+                </Text>
+              </View>
+              <View
+                className={`min-w-[22px] items-center rounded-full px-1.5 py-0.5 ${
+                  tabEstado === "vendidas" ? "bg-amber-100" : "bg-surface/80"
+                }`}
+              >
+                <Text
+                  className={`text-[10px] font-bold leading-3 ${
+                    tabEstado === "vendidas" ? "text-amber-800" : "text-ink-muted"
+                  }`}
+                >
+                  {listaVendidas.length}
+                </Text>
+              </View>
+            </View>
           </Pressable>
 
           <Pressable
             onPress={() => setTabEstado("todas")}
             accessibilityRole="tab"
             accessibilityState={{ selected: tabEstado === "todas" }}
-            className={`flex-1 flex-row items-center justify-center gap-2 rounded-xl py-2.5 px-3 transition-all cursor-pointer ${
+            className={`min-w-0 flex-1 items-center justify-center rounded-xl px-1 py-2 transition-all cursor-pointer ${
               tabEstado === "todas"
-                ? "bg-surface shadow-xs border border-line"
+                ? "border border-line bg-surface shadow-soft"
                 : "opacity-70 active:opacity-100"
             }`}
           >
-            <Icon
-              name="boxes"
-              size={15}
-              className={tabEstado === "todas" ? "text-sage-700" : "text-ink-muted"}
-            />
-            <Text
-              className={`text-xs font-bold ${
-                tabEstado === "todas" ? "text-ink" : "text-ink-muted"
+            <View
+              className={`items-center justify-center gap-1 ${
+                tabsApilados ? "flex-col" : "flex-row flex-wrap"
               }`}
             >
-              Todos ({listaTodas.length})
-            </Text>
+              <View className="min-w-0 shrink flex-row items-center justify-center gap-1">
+                <Icon
+                  name="boxes"
+                  size={14}
+                  className={tabEstado === "todas" ? "text-sage-700" : "text-ink-muted"}
+                />
+                <Text
+                  className={`shrink text-center text-[11px] font-bold leading-tight ${
+                    tabEstado === "todas" ? "text-ink" : "text-ink-muted"
+                  }`}
+                >
+                  Todos
+                </Text>
+              </View>
+              <View
+                className={`min-w-[22px] items-center rounded-full px-1.5 py-0.5 ${
+                  tabEstado === "todas" ? "bg-sage-100" : "bg-surface/80"
+                }`}
+              >
+                <Text
+                  className={`text-[10px] font-bold leading-3 ${
+                    tabEstado === "todas" ? "text-sage-700" : "text-ink-muted"
+                  }`}
+                >
+                  {listaTodas.length}
+                </Text>
+              </View>
+            </View>
           </Pressable>
         </View>
 
