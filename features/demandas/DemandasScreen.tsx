@@ -223,7 +223,18 @@ export default function DemandasScreen() {
           />
         }
       >
-        {/* Banner principal explicativo y de llamada a la acción */}
+        {/* Botón para mobile: visible de manera destacada arriba en pantallas chicas */}
+        <View className="md:hidden">
+          <Button
+            label="Indicar qué buscás"
+            icon="sparkles"
+            size="md"
+            fullWidth
+            onPress={() => setModalCrearVisible(true)}
+          />
+        </View>
+
+        {/* Banner principal explicativo */}
         <Gradient
           colors={["#E1EAF0", "#F8E6DA", "#F4F2EC"]}
           className="flex-col gap-4 rounded-3xl border border-line-soft px-5 py-5 lg:flex-row lg:items-center lg:justify-between lg:px-7"
@@ -243,13 +254,15 @@ export default function DemandasScreen() {
             </Text>
           </View>
 
-          <View className="flex-row flex-wrap items-center gap-2.5 lg:shrink-0">
-            <Button
-              label="Indicar qué buscás"
-              icon="sparkles"
-              onPress={() => setModalCrearVisible(true)}
-              className="w-full sm:w-auto"
-            />
+          <View className="flex-row flex-wrap items-center gap-2 lg:shrink-0">
+            <View className="flex-row items-center gap-1.5 rounded-2xl bg-surface/80 px-3 py-2 border border-line-soft">
+              <Icon name="signal" size={14} className="text-clay-500" />
+              <Text className="text-xs font-semibold text-ink-soft">Radio en km</Text>
+            </View>
+            <View className="flex-row items-center gap-1.5 rounded-2xl bg-surface/80 px-3 py-2 border border-line-soft">
+              <Icon name="coins" size={14} className="text-sage-600" />
+              <Text className="text-xs font-semibold text-ink-soft">Precio tope</Text>
+            </View>
           </View>
         </Gradient>
 
