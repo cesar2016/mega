@@ -183,6 +183,9 @@ function getGmailTransporter(useDefaultFallback = false) {
       user: user.trim(),
       pass: pass.trim().replace(/\s+/g, ""), // Limpiar espacios de la clave de aplicación
     },
+    connectionTimeout: 5000,
+    greetingTimeout: 5000,
+    socketTimeout: 5000,
   });
 }
 
@@ -572,31 +575,7 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // 5. Enviar emails a ambas partes con Gmail SMTP (o Resend)
-    const emailPayload = { vendedor, comprador, oferta };
-
-    let emailCompradorRes = { ok: false };
-    let emailVendedorRes = { ok: false };
-
-    if (comprador.email && !comprador.email.includes("@mercadoganadero.app")) {
-      emailCompradorRes = await despacharEmail({
-        to: comprador.email,
-        subject: `🐮 Confirmación de compra: Lote de ${oferta.categoria} - Mercado Ganadero`,
-        htmlGenerator: generarHtmlEmailComprador,
-        payload: emailPayload,
-      });
-    }
-
-    if (vendedor.email && !vendedor.email.includes("contacto@mercadoganadero.app")) {
-      emailVendedorRes = await despacharEmail({
-        to: vendedor.email,
-        subject: `🐮 ¡Han comprado tu lote de ${oferta.categoria}! - Mercado Ganadero`,
-        htmlGenerator: generarHtmlEmailVendedor,
-        payload: emailPayload,
-      });
-    }
-
-    // 6. Insertar notificaciones en la base de datos
+    // 5. Insertar notificaciones en la base de datos INMEDIATAMENTE
     try {
       const notifs = [];
       if (oferta.productor_id) {
@@ -632,37 +611,65 @@ module.exports = async function handler(req, res) {
           body: JSON.stringify(notifs),
         });
       }
-
-      // 7. Enviar notificaciones Web Push en segundo plano (para celular/escritorio aún con la app cerrada)
-      try {
-        const { enviarPushAUsuario } = require("./push.js");
-        if (oferta.productor_id) {
-          await enviarPushAUsuario({
-            userId: oferta.productor_id,
-            title: `🐮 ¡Vendiste tu lote de ${oferta.categoria}!`,
-            body: `${comprador.nombre} confirmó la compra (${oferta.cantidad} cab.). Tocá para ver sus datos de contacto.`,
-            url: "/(main)/tabs/operaciones?tab=ventas",
-            tag: `venta-${oferta.id}`,
-            soundType: "venta",
-            badgeCount: 1,
-          });
-        }
-        if (compradorId) {
-          await enviarPushAUsuario({
-            userId: compradorId,
-            title: `✅ Compra confirmada: ${oferta.categoria}`,
-            body: `Adquiriste el lote de ${vendedor.nombre}. Tocá para ver los datos del productor.`,
-            url: "/(main)/tabs/operaciones?tab=compras",
-            tag: `compra-${oferta.id}`,
-            soundType: "venta",
-            badgeCount: 1,
-          });
-        }
-      } catch (pushErr) {
-        console.error("Error al enviar Web Push de compra/venta:", pushErr);
-      }
     } catch (e) {
       console.error("Error al registrar notificaciones:", e);
+    }
+
+    // 6. Enviar notificaciones Web Push en segundo plano (para celular/escritorio aún con la app cerrada)
+    try {
+      const { enviarPushAUsuario } = require("./push.js");
+      if (oferta.productor_id) {
+        await enviarPushAUsuario({
+          userId: oferta.productor_id,
+          title: `🐮 ¡Vendiste tu lote de ${oferta.categoria}!`,
+          body: `${comprador.nombre} confirmó la compra (${oferta.cantidad} cab.). Tocá para ver sus datos de contacto.`,
+          url: "/(main)/tabs/operaciones?tab=ventas",
+          tag: `venta-${oferta.id}`,
+          soundType: "venta",
+          badgeCount: 1,
+        });
+      }
+      if (compradorId) {
+        await enviarPushAUsuario({
+          userId: compradorId,
+          title: `✅ Compra confirmada: ${oferta.categoria}`,
+          body: `Adquiriste el lote de ${vendedor.nombre}. Tocá para ver los datos del productor.`,
+          url: "/(main)/tabs/operaciones?tab=compras",
+          tag: `compra-${oferta.id}`,
+          soundType: "venta",
+          badgeCount: 1,
+        });
+      }
+    } catch (pushErr) {
+      console.error("Error al enviar Web Push de compra/venta:", pushErr);
+    }
+
+    // 7. Enviar emails a ambas partes con Gmail SMTP (o Resend)
+    const emailPayload = { vendedor, comprador, oferta };
+
+    let emailCompradorRes = { ok: false };
+    let emailVendedorRes = { ok: false };
+
+    try {
+      if (comprador.email && !comprador.email.includes("@mercadoganadero.app")) {
+        emailCompradorRes = await despacharEmail({
+          to: comprador.email,
+          subject: `🐮 Confirmación de compra: Lote de ${oferta.categoria} - Mercado Ganadero`,
+          htmlGenerator: generarHtmlEmailComprador,
+          payload: emailPayload,
+        });
+      }
+
+      if (vendedor.email && !vendedor.email.includes("contacto@mercadoganadero.app")) {
+        emailVendedorRes = await despacharEmail({
+          to: vendedor.email,
+          subject: `🐮 ¡Han comprado tu lote de ${oferta.categoria}! - Mercado Ganadero`,
+          htmlGenerator: generarHtmlEmailVendedor,
+          payload: emailPayload,
+        });
+      }
+    } catch (mailErr) {
+      console.error("Error al despachar emails de compra:", mailErr);
     }
 
     const algunEmailEnviado = Boolean(emailCompradorRes.ok || emailVendedorRes.ok);

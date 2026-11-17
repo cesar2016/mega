@@ -612,40 +612,50 @@ export default function OfferCreateScreen() {
                   </View>
                 </View>
 
-                <Input
-                  label="Categoría"
-                  value={values.categoria ?? ""}
-                  onChangeText={(text) => form.setValue("categoria", text)}
-                  placeholder="Ej: novillos, vaquillonas, terneros..."
-                  icon="tag"
-                />
+                <View className="gap-2.5">
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                      Categoría (elegí de la lista)
+                    </Text>
+                    {values.categoria ? (
+                      <Badge tone="sage" icon="check">
+                        {values.categoria}
+                      </Badge>
+                    ) : (
+                      <Text className="text-[11px] font-medium text-clay-600">Requerido</Text>
+                    )}
+                  </View>
 
-                <View className="flex-row flex-wrap gap-2">
-                  {CATEGORIAS.map((categoria) => {
-                    const activa = values.categoria === categoria;
-                    return (
-                      <Pressable
-                        key={categoria}
-                        onPress={() => form.setValue("categoria", categoria)}
-                        accessibilityRole="button"
-                        className={[
-                          "rounded-full border px-3.5 py-1.5",
-                          activa
-                            ? "border-sage-500 bg-sage-500"
-                            : "border-line bg-surface active:bg-surface-sunk",
-                        ].join(" ")}
-                      >
-                        <Text
+                  <View className="flex-row flex-wrap gap-2">
+                    {CATEGORIAS.map((cat) => {
+                      const activa = values.categoria === cat;
+                      return (
+                        <Pressable
+                          key={cat}
+                          onPress={() => form.setValue("categoria", cat, { shouldValidate: true })}
+                          accessibilityRole="button"
                           className={[
-                            "text-xs font-semibold",
-                            activa ? "text-white" : "text-ink-soft",
+                            "flex-row items-center gap-1.5 rounded-xl border px-3.5 py-2.5",
+                            activa
+                              ? "border-sage-600 bg-sage-500 shadow-soft"
+                              : "border-line bg-surface active:bg-surface-sunk",
                           ].join(" ")}
                         >
-                          {categoria}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
+                          {activa ? (
+                            <Icon name="check" size={14} className="text-white" />
+                          ) : null}
+                          <Text
+                            className={[
+                              "text-xs font-bold",
+                              activa ? "text-white" : "text-ink-soft",
+                            ].join(" ")}
+                          >
+                            {cat}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
                 </View>
 
                 <View className="grid grid-cols-1 gap-4 sm:grid-cols-2">

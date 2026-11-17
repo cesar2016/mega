@@ -2,6 +2,7 @@ import React from "react";
 import { Linking, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { showToast } from "lib/utils";
+import { abrirWhatsAppEnlace } from "lib/whatsapp";
 import { Icon } from "components/ui/Icon";
 import { Badge, Card } from "components/ui/Card";
 import { Button } from "components/ui/Button";
@@ -60,19 +61,11 @@ export function OperacionCard({
   const establecimiento = !esVenta ? operacion.vendedor_establecimiento : null;
 
   const abrirWhatsApp = (numero?: string | null) => {
-    if (!numero || numero.includes("No informado") || numero.includes("No especificado")) {
-      showToast("Teléfono no disponible", "info");
-      return;
-    }
-    const limpio = numero.replace(/[^0-9]/g, "");
     const mensaje = esVenta
       ? `Hola ${contraparteNombre}! Te contacto desde Mercado Ganadero por la compra confirmada de mi lote de ${operacion.categoria} (${operacion.cantidad} cabezas).`
       : `Hola ${contraparteNombre}! Te contacto desde Mercado Ganadero por la compra confirmada de tu lote de ${operacion.categoria} (${operacion.cantidad} cabezas).`;
 
-    const url = `https://wa.me/${limpio}?text=${encodeURIComponent(mensaje)}`;
-    Linking.openURL(url).catch(() => {
-      showToast("No se pudo abrir WhatsApp", "error");
-    });
+    abrirWhatsAppEnlace(numero, mensaje);
   };
 
   const llamar = (numero?: string | null) => {

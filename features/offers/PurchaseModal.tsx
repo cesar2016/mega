@@ -15,6 +15,7 @@ import { Button } from "components/ui/Button";
 import { Badge } from "components/ui/Card";
 import { WhatsAppIcon } from "components/ui/SocialIcons";
 import { showToast } from "lib/utils";
+import { abrirWhatsAppEnlace } from "lib/whatsapp";
 import { isSupabaseConfigured, supabase } from "lib/supabase";
 import type { UserProfile } from "store/authStore";
 
@@ -186,6 +187,21 @@ export function PurchaseModal({
                 entidad_id: oferta.id,
               },
             ]);
+
+            // Enviar Web Push al celular del vendedor
+            fetch("/api/push", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userId: oferta.productor_id,
+                title: `🐮 ¡Vendiste tu lote de ${oferta.categoria}!`,
+                body: `${compradorNombre} confirmó la compra (${oferta.cantidad} cab.). Tocá para ver sus datos de contacto.`,
+                url: "/(main)/tabs/operaciones?tab=ventas",
+                tag: `venta-${oferta.id}`,
+                soundType: "venta",
+                badgeCount: 1,
+              }),
+            }).catch(() => {});
           } catch (err) {
             console.error("Error al consultar datos del vendedor en Supabase:", err);
           }
@@ -271,13 +287,10 @@ export function PurchaseModal({
   };
 
   const abrirWhatsApp = (numero: string) => {
-    const limpio = numero.replace(/[^0-9]/g, "");
-    const url = `https://wa.me/${limpio}?text=${encodeURIComponent(
+    abrirWhatsAppEnlace(
+      numero,
       `Hola! Te contacto desde Mercado Ganadero por la compra confirmada de tu lote de ${oferta.categoria} (${oferta.cantidad} cabezas).`
-    )}`;
-    Linking.openURL(url).catch(() => {
-      showToast("No se pudo abrir WhatsApp", "error");
-    });
+    );
   };
 
   const llamarTelefono = (numero: string) => {

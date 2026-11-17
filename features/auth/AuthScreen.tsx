@@ -76,6 +76,7 @@ export default function AuthScreen() {
   );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [nombre, setNombre] = useState("");
   const [cuit, setCuit] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +107,14 @@ export default function AuthScreen() {
       }
       if (!isValidCuitFormat(cuit.trim())) {
         setError("El CUIT debe tener el formato 00-12345678-0 (11 dígitos con guiones)");
+        return;
+      }
+      if (password.length < 6) {
+        setError("La contraseña debe tener al menos 6 caracteres");
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError("Las contraseñas no coinciden. Por favor repetí la misma contraseña.");
         return;
       }
     }
@@ -229,6 +238,7 @@ export default function AuthScreen() {
     setMode(nuevo);
     setError(null);
     setInfo(null);
+    setConfirmPassword("");
   };
 
   return (
@@ -403,12 +413,30 @@ export default function AuthScreen() {
                 <Input
                   label="Contraseña"
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(t) => {
+                    setPassword(t);
+                    setError(null);
+                  }}
                   placeholder="Mínimo 6 caracteres"
                   secureTextEntry
                   icon="lock"
                   hint={mode === "registro" ? "Mínimo 6 caracteres." : undefined}
                 />
+
+                {mode === "registro" ? (
+                  <Input
+                    label="Confirmar contraseña"
+                    value={confirmPassword}
+                    onChangeText={(t) => {
+                      setConfirmPassword(t);
+                      setError(null);
+                    }}
+                    placeholder="Repetí tu contraseña"
+                    secureTextEntry
+                    icon="lock"
+                    hint="Debe coincidir exactamente con la contraseña."
+                  />
+                ) : null}
 
                 {error ? (
                   <View className="flex-row items-start gap-2 rounded-2xl bg-clay-50 px-3.5 py-3">

@@ -1,7 +1,24 @@
 import React from "react";
+import { Platform } from "react-native";
 import { Redirect } from "expo-router";
 import { isSupabaseConfigured } from "lib/supabase";
 import { useAuthStore } from "store/authStore";
+
+/**
+ * Detecta si hay tokens o parámetros de autenticación en la URL de la web
+ * (ej: confirmación de correo o inicio de sesión con magic link o PKCE).
+ */
+export function tieneTokenAuthEnUrl(): boolean {
+  if (Platform.OS !== "web" || typeof window === "undefined") return false;
+  const search = window.location.search || "";
+  const hash = window.location.hash || "";
+  return (
+    search.includes("code=") ||
+    search.includes("token=") ||
+    hash.includes("access_token=") ||
+    hash.includes("type=")
+  );
+}
 
 /**
  * Redirige a /auth cuando hay sesión real pero el usuario no está autenticado.
@@ -12,7 +29,7 @@ export function useAuthRedirect(options?: { enabled?: boolean; returnUrl?: strin
   const user = useAuthStore((state) => state.user);
   const loading = useAuthStore((state) => state.loading);
 
-  if (!enabled || loading) return null;
+  if (!enabled || loading || tieneTokenAuthEnUrl()) return null;
   if (isSupabaseConfigured && !user) {
     return (
       <Redirect
@@ -34,7 +51,7 @@ export function useGuestRedirect(defaultHref: string = "/"): React.ReactElement 
   const user = useAuthStore((state) => state.user);
   const loading = useAuthStore((state) => state.loading);
 
-  if (loading) return null;
+  if (loading || tieneTokenAuthEnUrl()) return null;
   if (isSupabaseConfigured && user) return <Redirect href={defaultHref as any} />;
   return null;
 }
@@ -48,7 +65,7 @@ export function useOnboardingRedirect(): React.ReactElement | null {
   const profile = useAuthStore((state) => state.profile);
   const loading = useAuthStore((state) => state.loading);
 
-  if (loading) return null;
+  if (loading || tieneTokenAuthEnUrl()) return null;
   if (isSupabaseConfigured && !user) return <Redirect href="/auth" />;
   if (profile?.onboarding_completado === true) return <Redirect href="/" />;
   return null;
